@@ -13,9 +13,9 @@ function TabIcon({ icon, iconFocused, label, focused }: {
   focused: boolean
 }) {
   return (
-    <View style={{ alignItems: 'center', gap: 2, paddingTop: 8 }}>
+    <View style={{ alignItems: 'center', gap: 2, paddingTop: 8, width: 72 }}>
       <Ionicons name={focused ? iconFocused : icon} size={24} color={focused ? '#C9A84C' : '#6B7280'} />
-      <Text style={{ fontSize: 11, color: focused ? '#C9A84C' : '#6B7280', fontWeight: focused ? '600' : '400' }}>
+      <Text numberOfLines={1} style={{ fontSize: 10, color: focused ? '#C9A84C' : '#6B7280', fontWeight: focused ? '600' : '400' }}>
         {label}
       </Text>
     </View>

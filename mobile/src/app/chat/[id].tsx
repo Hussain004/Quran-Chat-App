@@ -240,7 +240,7 @@ export default function ChatScreen() {
             onPress={() => handleSend()}
             disabled={!input.trim() || loading}
           >
-            <Ionicons name="arrow-up" size={20} color="#1A4731" />
+            <Ionicons name="arrow-up" size={20} color={(!input.trim() || loading) ? '#4B6858' : '#1A4731'} />
           </TouchableOpacity>
         </View>
       </View>
