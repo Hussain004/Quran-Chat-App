@@ -37,8 +37,29 @@
         }
       ],
       "expo-secure-store",
-      ["expo-font", {"fonts": ["./assets/fonts/NoorHira.ttf"]}],
-      "expo-status-bar"
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/NoorHira.ttf"
+          ]
+        }
+      ],
+      "expo-status-bar",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "gradleProperties": {
+              "org.gradle.jvmargs": "-Xmx3072m -XX:MaxMetaspaceSize=512m",
+              "org.gradle.workers.max": "2",
+              "org.gradle.daemon": "false",
+              "org.gradle.parallel": "false",
+              "reactNativeArchitectures": "arm64-v8a"
+            }
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

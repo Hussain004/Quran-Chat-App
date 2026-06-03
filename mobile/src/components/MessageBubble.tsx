@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Clipboard } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Share } from 'react-native'
 import * as Haptics from 'expo-haptics'
 import { VerseCard } from './VerseCard'
 import type { CitedVerse } from '@/lib/api'
@@ -17,7 +17,7 @@ export function MessageBubble({ role, content, citedVerses, lowConfidence, faile
 
   function handleLongPress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    Clipboard.setString(content)
+    Share.share({ message: content })
   }
 
   if (isUser) {
