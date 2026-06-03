@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const maxDuration = 10
+
 export async function POST(req: NextRequest) {
   try {
     const { message } = await req.json()
