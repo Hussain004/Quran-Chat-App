@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { ConversationSkeleton } from '@/components/Skeleton'
 import * as Haptics from 'expo-haptics'
 
 type Conversation = {
@@ -54,6 +55,7 @@ function formatTime(dateStr: string): string {
 
 export default function HistoryScreen() {
   const [sections, setSections] = useState<Section[]>([])
+  const [initialLoading, setInitialLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
@@ -65,6 +67,7 @@ export default function HistoryScreen() {
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
     if (data) setSections(groupByDate(data as Conversation[]))
+    setInitialLoading(false)
   }, [])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
@@ -98,14 +101,16 @@ export default function HistoryScreen() {
     )
   }
 
-  const isEmpty = sections.length === 0
-
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       <Text style={styles.pageHeader}>History</Text>
 
-      {isEmpty ? (
+      {initialLoading ? (
+        <View style={styles.skeletonList}>
+          {Array.from({ length: 6 }).map((_, i) => <ConversationSkeleton key={i} />)}
+        </View>
+      ) : sections.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📜</Text>
           <Text style={styles.emptyTitle}>No conversations yet</Text>
@@ -145,6 +150,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1B14' },
   pageHeader: { color: '#F8F4ED', fontSize: 28, fontWeight: '700', padding: 24, paddingTop: 64, paddingBottom: 8 },
   list: { paddingHorizontal: 24, paddingBottom: 40 },
+  skeletonList: { paddingHorizontal: 24, paddingTop: 12 },
 
   sectionHeader: {
     color: '#9CA3AF', fontSize: 12, fontWeight: '600',

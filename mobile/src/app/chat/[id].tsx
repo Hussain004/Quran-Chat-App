@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   View, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, Text, Alert
+  KeyboardAvoidingView, Platform, Text, Alert, Keyboard
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router } from 'expo-router'
@@ -16,6 +16,7 @@ type ChatMessage = Message & {
   id: string
   citedVerses?: CitedVerse[]
   lowConfidence?: boolean
+  failed?: boolean
 }
 
 const MAX_CHARS = 500
@@ -91,7 +92,7 @@ export default function ChatScreen() {
     setLoading(true)
     scrollToBottom()
 
-    const history = messages.map(m => ({ role: m.role, content: m.content }))
+    const history = messages.filter(m => !m.failed).map(m => ({ role: m.role, content: m.content }))
 
     try {
       const { reply, citedVerses, lowConfidence } = await sendMessage(text, history)
@@ -145,13 +146,17 @@ export default function ChatScreen() {
           .update({ title: newTitle })
           .eq('id', id)
       }
-    } catch (err: any) {
+    } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-      Alert.alert('Error', err.message ?? 'Something went wrong. Tap to retry.')
-      setMessages(prev => prev.filter(m => m.id !== userMsg.id))
+      setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, failed: true } : m))
     } finally {
       setLoading(false)
     }
+  }
+
+  function retryMessage(failedMsg: ChatMessage) {
+    setMessages(prev => prev.filter(m => m.id !== failedMsg.id))
+    setTimeout(() => handleSend(failedMsg.content), 0)
   }
 
   const charsLeft = MAX_CHARS - input.length
@@ -182,6 +187,7 @@ export default function ChatScreen() {
         estimatedItemSize={100}
         contentContainerStyle={styles.listContent}
         onContentSizeChange={scrollToBottom}
+        onScrollBeginDrag={Keyboard.dismiss}
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyState}>
@@ -198,6 +204,8 @@ export default function ChatScreen() {
               content={item.content}
               citedVerses={item.citedVerses}
               lowConfidence={item.lowConfidence}
+              failed={item.failed}
+              onRetry={() => retryMessage(item)}
             />
           )
         }}

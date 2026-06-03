@@ -1,8 +1,9 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { supabase } from '@/lib/supabase'
 import { useState, useCallback } from 'react'
+import { ConversationSkeleton } from '@/components/Skeleton'
 import * as Haptics from 'expo-haptics'
 
 const SUGGESTED_QUESTIONS = [
@@ -20,6 +21,8 @@ export default function HomeScreen() {
   const [conversations, setConversations] = useState<any[]>([])
   const [displayName, setDisplayName] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
+  const [recentsLoading, setRecentsLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -37,18 +40,24 @@ export default function HomeScreen() {
 
     if (profile?.display_name) setDisplayName(profile.display_name)
     if (convs) setConversations(convs)
+    setRecentsLoading(false)
   }, [])
 
-  useFocusEffect(useCallback(() => { loadData() }, [loadData]))
+  useFocusEffect(useCallback(() => {
+    setRecentsLoading(true)
+    loadData()
+  }, [loadData]))
 
   async function startNewConversation(initialMessage?: string) {
-    if (!userId) return
+    if (!userId || creating) return
+    setCreating(true)
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     const { data, error } = await supabase
       .from('conversations')
       .insert({ user_id: userId, title: 'New Conversation' })
       .select()
       .single()
+    setCreating(false)
     if (error || !data) return
     router.push({ pathname: '/chat/[id]', params: { id: data.id, initialMessage: initialMessage ?? '' } })
   }
@@ -67,30 +76,50 @@ export default function HomeScreen() {
         <Text style={styles.subtitle}>What would you like to know?</Text>
       </View>
 
-      <TouchableOpacity style={styles.newChatBtn} onPress={() => startNewConversation()} activeOpacity={0.8}>
-        <Text style={styles.newChatIcon}>✦</Text>
+      <TouchableOpacity
+        style={[styles.newChatBtn, creating && styles.newChatBtnDisabled]}
+        onPress={() => startNewConversation()}
+        activeOpacity={0.8}
+        disabled={creating}
+      >
+        {creating ? (
+          <ActivityIndicator color="#C9A84C" size="small" />
+        ) : (
+          <Text style={styles.newChatIcon}>✦</Text>
+        )}
         <Text style={styles.newChatText}>New Conversation</Text>
-        <Text style={styles.newChatArrow}>→</Text>
+        {!creating && <Text style={styles.newChatArrow}>→</Text>}
       </TouchableOpacity>
 
       <Text style={styles.sectionLabel}>Explore Topics</Text>
       <View style={styles.chips}>
         {SUGGESTED_QUESTIONS.map((q, i) => (
-          <TouchableOpacity key={i} style={styles.chip} onPress={() => startNewConversation(q)} activeOpacity={0.75}>
+          <TouchableOpacity key={i} style={styles.chip} onPress={() => startNewConversation(q)} activeOpacity={0.75} disabled={creating}>
             <Text style={styles.chipText}>{q}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {conversations.length > 0 && (
-        <View style={styles.recentSection}>
-          <View style={styles.sectionRow}>
-            <Text style={styles.sectionLabel}>Recent</Text>
+      <View style={styles.recentSection}>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionLabel}>Recent</Text>
+          {!recentsLoading && conversations.length > 0 && (
             <TouchableOpacity onPress={() => router.push('/history')}>
               <Text style={styles.seeAll}>See all →</Text>
             </TouchableOpacity>
-          </View>
-          {conversations.map(conv => (
+          )}
+        </View>
+
+        {recentsLoading ? (
+          <>
+            <ConversationSkeleton />
+            <ConversationSkeleton />
+            <ConversationSkeleton />
+          </>
+        ) : conversations.length === 0 ? (
+          <Text style={styles.noRecents}>No conversations yet — start one above</Text>
+        ) : (
+          conversations.map(conv => (
             <TouchableOpacity
               key={conv.id}
               style={styles.convCard}
@@ -103,9 +132,9 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.convArrow}>›</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-      )}
+          ))
+        )}
+      </View>
     </ScrollView>
   )
 }
@@ -137,6 +166,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     borderWidth: 1, borderColor: '#2D6A4F', marginBottom: 28,
   },
+  newChatBtnDisabled: { opacity: 0.65 },
   newChatIcon: { color: '#C9A84C', fontSize: 18 },
   newChatText: { flex: 1, color: '#F8F4ED', fontSize: 16, fontWeight: '600' },
   newChatArrow: { color: '#C9A84C', fontSize: 18 },
@@ -157,6 +187,7 @@ const styles = StyleSheet.create({
   recentSection: { marginTop: 24 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   seeAll: { color: '#C9A84C', fontSize: 13 },
+  noRecents: { color: '#4B6858', fontSize: 14, textAlign: 'center', paddingVertical: 16 },
 
   convCard: {
     backgroundColor: '#152B1F', borderRadius: 14, padding: 16,

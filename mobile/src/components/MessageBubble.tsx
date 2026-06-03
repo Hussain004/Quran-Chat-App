@@ -8,9 +8,11 @@ type Props = {
   content: string
   citedVerses?: CitedVerse[]
   lowConfidence?: boolean
+  failed?: boolean
+  onRetry?: () => void
 }
 
-export function MessageBubble({ role, content, citedVerses, lowConfidence }: Props) {
+export function MessageBubble({ role, content, citedVerses, lowConfidence, failed, onRetry }: Props) {
   const isUser = role === 'user'
 
   function handleLongPress() {
@@ -21,9 +23,20 @@ export function MessageBubble({ role, content, citedVerses, lowConfidence }: Pro
   if (isUser) {
     return (
       <View style={styles.userRow}>
-        <TouchableOpacity style={styles.userBubble} onLongPress={handleLongPress} activeOpacity={0.85}>
-          <Text style={styles.userText}>{content}</Text>
-        </TouchableOpacity>
+        <View style={styles.userMsgGroup}>
+          <TouchableOpacity
+            style={[styles.userBubble, failed && styles.userBubbleFailed]}
+            onLongPress={handleLongPress}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.userText}>{content}</Text>
+          </TouchableOpacity>
+          {failed && (
+            <TouchableOpacity style={styles.retryRow} onPress={onRetry}>
+              <Text style={styles.retryText}>↺ Failed — tap to retry</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     )
   }
@@ -52,8 +65,12 @@ export function MessageBubble({ role, content, citedVerses, lowConfidence }: Pro
 
 const styles = StyleSheet.create({
   userRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, paddingVertical: 4 },
-  userBubble: { backgroundColor: '#1A4731', borderRadius: 18, borderBottomRightRadius: 4, paddingHorizontal: 16, paddingVertical: 12, maxWidth: '80%' },
+  userMsgGroup: { alignItems: 'flex-end', maxWidth: '80%' },
+  userBubble: { backgroundColor: '#1A4731', borderRadius: 18, borderBottomRightRadius: 4, paddingHorizontal: 16, paddingVertical: 12 },
+  userBubbleFailed: { backgroundColor: '#3B1A1A', borderColor: '#7A2A2A', borderWidth: 1 },
   userText: { color: '#F8F4ED', fontSize: 15, lineHeight: 22 },
+  retryRow: { marginTop: 4, paddingHorizontal: 4 },
+  retryText: { color: '#F87171', fontSize: 12 },
 
   aiRow: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 4, gap: 8, alignItems: 'flex-start' },
   aiAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#C9A84C20', justifyContent: 'center', alignItems: 'center', marginTop: 4, borderWidth: 1, borderColor: '#C9A84C40' },
