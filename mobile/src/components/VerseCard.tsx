@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   verseItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: '#1E3525', gap: 8 },
   badge: { backgroundColor: '#C9A84C20', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#C9A84C40' },
   badgeText: { color: '#C9A84C', fontSize: 12, fontWeight: '600' },
-  arabic: { color: '#F8F4ED', fontSize: 20, textAlign: 'right', lineHeight: 36, fontWeight: '400' },
+  arabic: { color: '#F8F4ED', fontSize: 26, textAlign: 'right', lineHeight: 48, fontFamily: 'NoorHira' },
   translation: { color: '#D1CEC8', fontSize: 13, lineHeight: 20 },
   hint: { color: '#6B7280', fontSize: 11, textAlign: 'center', paddingVertical: 8 },
 })

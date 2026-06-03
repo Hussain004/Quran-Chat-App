@@ -29,7 +29,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0D1B14",
           "android": {
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76
@@ -37,7 +37,7 @@
         }
       ],
       "expo-secure-store",
-      "expo-font",
+      ["expo-font", {"fonts": ["./assets/fonts/NoorHira.ttf"]}],
       "expo-status-bar"
     ],
     "experiments": {

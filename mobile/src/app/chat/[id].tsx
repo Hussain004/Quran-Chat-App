@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   listContent: { paddingVertical: 16 },
 
   emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
-  emptyArabic: { color: '#C9A84C', fontSize: 22, textAlign: 'center' },
+  emptyArabic: { color: '#C9A84C', fontSize: 26, textAlign: 'center', fontFamily: 'NoorHira', lineHeight: 48 },
   emptyText: { color: '#6B7280', fontSize: 15 },
 
   inputBar: { borderTopWidth: 1, borderTopColor: '#1E3525', paddingHorizontal: 12, paddingVertical: 10, paddingBottom: Platform.OS === 'android' ? 16 : 10, backgroundColor: '#0D1B14' },

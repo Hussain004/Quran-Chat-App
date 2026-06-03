@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   content: { padding: 24, paddingTop: 64, paddingBottom: 48 },
 
   header: { alignItems: 'center', marginBottom: 28 },
-  bismillah: { color: '#C9A84C', fontSize: 22, textAlign: 'center', marginBottom: 10 },
+  bismillah: { color: '#C9A84C', fontSize: 26, textAlign: 'center', marginBottom: 10, fontFamily: 'NoorHira', lineHeight: 48 },
   greeting: { color: '#F8F4ED', fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 6 },
   subtitle: { color: '#9CA3AF', fontSize: 15 },
 

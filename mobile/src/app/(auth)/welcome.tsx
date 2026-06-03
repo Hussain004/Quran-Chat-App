@@ -28,7 +28,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1A4731', justifyContent: 'space-between', padding: 32 },
   top: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  bismillah: { color: '#C9A84C', fontSize: 28, textAlign: 'center', marginBottom: 8 },
+  bismillah: { color: '#C9A84C', fontSize: 32, textAlign: 'center', marginBottom: 8, fontFamily: 'NoorHira', lineHeight: 56 },
   title: { color: '#F8F4ED', fontSize: 36, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: '#F8F4ED', fontSize: 16, textAlign: 'center', opacity: 0.8, lineHeight: 24 },
   buttons: { gap: 12 },
