@@ -1,12 +1,59 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native'
-import { router } from 'expo-router'
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, RefreshControl, Alert } from 'react-native'
+import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { formatDistanceToNow } from 'date-fns'
+import * as Haptics from 'expo-haptics'
+
+type Conversation = {
+  id: string
+  title: string
+  updated_at: string
+}
+
+type Section = {
+  title: string
+  data: Conversation[]
+}
+
+function groupByDate(convs: Conversation[]): Section[] {
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000)
+  const weekStart = new Date(todayStart.getTime() - 6 * 86400000)
+
+  const buckets: Record<string, Conversation[]> = {
+    Today: [],
+    Yesterday: [],
+    'This Week': [],
+    Earlier: [],
+  }
+
+  for (const conv of convs) {
+    const d = new Date(conv.updated_at)
+    if (d >= todayStart) buckets['Today'].push(conv)
+    else if (d >= yesterdayStart) buckets['Yesterday'].push(conv)
+    else if (d >= weekStart) buckets['This Week'].push(conv)
+    else buckets['Earlier'].push(conv)
+  }
+
+  return (Object.entries(buckets) as [string, Conversation[]][])
+    .filter(([, items]) => items.length > 0)
+    .map(([title, data]) => ({ title, data }))
+}
+
+function formatTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  if (hours < 24) return `${hours}h ago`
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 export default function HistoryScreen() {
-  const [conversations, setConversations] = useState<any[]>([])
+  const [sections, setSections] = useState<Section[]>([])
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
@@ -17,10 +64,10 @@ export default function HistoryScreen() {
       .select('*')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
-    if (data) setConversations(data)
+    if (data) setSections(groupByDate(data as Conversation[]))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -28,40 +75,96 @@ export default function HistoryScreen() {
     setRefreshing(false)
   }, [load])
 
+  function confirmDelete(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    Alert.alert(
+      'Delete Conversation',
+      'This will permanently delete this conversation and all its messages.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: async () => {
+            await supabase.from('messages').delete().eq('conversation_id', id)
+            await supabase.from('conversations').delete().eq('id', id)
+            setSections(prev =>
+              prev
+                .map(s => ({ ...s, data: s.data.filter(c => c.id !== id) }))
+                .filter(s => s.data.length > 0)
+            )
+          },
+        },
+      ]
+    )
+  }
+
+  const isEmpty = sections.length === 0
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <Text style={styles.header}>History</Text>
-      <FlatList
-        data={conversations}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C9A84C" />}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No conversations yet. Start one from the home screen.</Text>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })}
-          >
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardTime}>
-              {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
+      <Text style={styles.pageHeader}>History</Text>
+
+      {isEmpty ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>📜</Text>
+          <Text style={styles.emptyTitle}>No conversations yet</Text>
+          <Text style={styles.emptySubtitle}>Start one from the home screen</Text>
+        </View>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C9A84C" />}
+          renderSectionHeader={({ section }) => (
+            <Text style={styles.sectionHeader}>{section.title}</Text>
+          )}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })}
+              onLongPress={() => confirmDelete(item.id)}
+              activeOpacity={0.75}
+            >
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.cardTime}>{formatTime(item.updated_at)}</Text>
+              </View>
+              <Text style={styles.cardArrow}>›</Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1B14' },
-  header: { color: '#F8F4ED', fontSize: 28, fontWeight: '700', padding: 24, paddingTop: 64 },
-  list: { padding: 24, paddingTop: 0, gap: 12 },
-  card: { backgroundColor: '#152B1F', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#2D4A38' },
+  pageHeader: { color: '#F8F4ED', fontSize: 28, fontWeight: '700', padding: 24, paddingTop: 64, paddingBottom: 8 },
+  list: { paddingHorizontal: 24, paddingBottom: 40 },
+
+  sectionHeader: {
+    color: '#9CA3AF', fontSize: 12, fontWeight: '600',
+    textTransform: 'uppercase', letterSpacing: 1.5,
+    marginTop: 20, marginBottom: 10,
+  },
+
+  card: {
+    backgroundColor: '#152B1F', borderRadius: 14,
+    padding: 16, borderWidth: 1, borderColor: '#2D4A38',
+    flexDirection: 'row', alignItems: 'center',
+    marginBottom: 8,
+  },
+  cardContent: { flex: 1 },
   cardTitle: { color: '#F8F4ED', fontSize: 15, fontWeight: '500', marginBottom: 4 },
-  cardTime: { color: '#6B7280', fontSize: 13 },
-  empty: { color: '#6B7280', textAlign: 'center', marginTop: 60, fontSize: 15 },
+  cardTime: { color: '#6B7280', fontSize: 12 },
+  cardArrow: { color: '#4B6858', fontSize: 22, marginLeft: 8 },
+
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  emptyIcon: { fontSize: 44, marginBottom: 4 },
+  emptyTitle: { color: '#F8F4ED', fontSize: 18, fontWeight: '600' },
+  emptySubtitle: { color: '#6B7280', fontSize: 14 },
 })
