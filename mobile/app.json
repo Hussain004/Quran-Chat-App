@@ -10,10 +10,6 @@
     "ios": {
       "icon": "./assets/expo.icon"
     },
-    "androidNavigationBar": {
-      "backgroundColor": "#0D1B14",
-      "barStyle": "light-content"
-    },
     "android": {
       "package": "com.hussain004.quranchat",
       "adaptiveIcon": {
