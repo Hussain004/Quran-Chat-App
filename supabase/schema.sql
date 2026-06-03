@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS verses (
   surah_name_en TEXT NOT NULL,
   surah_name_ar TEXT NOT NULL,
   juz_number    INT,
-  embedding     vector(768),          -- Gemini text-embedding-004
+  embedding     vector(768),          -- Gemini gemini-embedding-001 (768-dim)
   UNIQUE(surah_number, ayah_number)
 );
 

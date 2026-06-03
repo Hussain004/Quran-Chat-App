@@ -1,19 +1,19 @@
 /**
- * Ingest all 6,236 Qur'anic verses into Supabase with Gemini embeddings.
+ * Ingest all 6,236 Qur'anic verses into Supabase with Jina AI embeddings.
  *
- * Resumable: already-embedded verses are skipped, so you can re-run safely
- * if the script is interrupted.
+ * Resumable: already-embedded verses are skipped on re-run.
+ * Embedding model: jina-embeddings-v2-base-en (768-dim, 1M free tokens/month)
  *
  * Usage:
- *   cd scripts && npm install && node ingest-quran.js
+ *   cd scripts && node ingest-quran.js
  *
- * Required env vars (in scripts/.env or exported in shell):
- *   SUPABASE_URL, SUPABASE_SERVICE_KEY, GEMINI_API_KEY
+ * Required env vars (in .env at project root):
+ *   SUPABASE_URL, SUPABASE_SERVICE_KEY, JINA_API_KEY
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { readFileSync } from 'fs'
+import ws from 'ws'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -35,47 +35,91 @@ try {
   // .env not found — expect vars to be set in environment
 }
 
-const { SUPABASE_URL, SUPABASE_SERVICE_KEY, GEMINI_API_KEY } = process.env
+const { SUPABASE_URL, SUPABASE_SERVICE_KEY, JINA_API_KEY } = process.env
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !GEMINI_API_KEY) {
-  console.error('Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_KEY, GEMINI_API_KEY')
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !JINA_API_KEY) {
+  console.error('Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_KEY, JINA_API_KEY')
   process.exit(1)
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-const genai = new GoogleGenerativeAI(GEMINI_API_KEY)
-const embedModel = genai.getGenerativeModel({ model: 'text-embedding-004' })
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  realtime: { transport: ws },
+})
 
-const BATCH_SIZE = 50
-const DELAY_MS = 1200  // ~50 req/min safely under free tier (1,500 req/min limit)
+const BATCH_SIZE = 100   // Jina supports up to 2048 inputs per call
+const DELAY_MS = 500     // Jina free tier is generous — 500ms between batches is safe
 
 async function sleep(ms) {
   return new Promise(r => setTimeout(r, ms))
 }
 
-async function embedWithRetry(text, retries = 3) {
+// Jina AI batch embedding — up to 2048 texts per call, 768-dim output
+async function embedBatchWithRetry(texts, retries = 4) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const result = await embedModel.embedContent(text)
-      return result.embedding.values
+      const res = await fetch('https://api.jina.ai/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${JINA_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'jina-embeddings-v2-base-en',
+          input: texts,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(`${res.status}: ${JSON.stringify(err.detail ?? err)}`)
+      }
+      const data = await res.json()
+      // data.data is sorted by index — map back to original order
+      const sorted = data.data.sort((a, b) => a.index - b.index)
+      return sorted.map(item => item.embedding)  // array of 768-dim float arrays
     } catch (err) {
       if (attempt === retries) throw err
-      console.warn(`  Embed failed (attempt ${attempt}/${retries}), retrying in 3s…`)
-      await sleep(3000)
+      console.warn(`  Batch embed failed (attempt ${attempt}/${retries}), retrying in 5s…`)
+      await sleep(5000)
+    }
+  }
+}
+
+async function fetchWithRetry(url, label, retries = 4) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 30_000)
+      const res = await fetch(url, { signal: controller.signal })
+      clearTimeout(timer)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    } catch (err) {
+      if (attempt === retries) throw new Error(`${label} failed after ${retries} attempts: ${err.message}`)
+      console.warn(`  ${label}: attempt ${attempt}/${retries} failed (${err.message}), retrying in 5s…`)
+      await sleep(5000)
     }
   }
 }
 
 async function fetchQuranData() {
+  const cacheFile = resolve(__dir, 'quran-cache.json')
+
+  if (existsSync(cacheFile)) {
+    console.log('Using cached Quran data (quran-cache.json)…')
+    return JSON.parse(readFileSync(cacheFile, 'utf8'))
+  }
+
   console.log('Fetching Arabic text from alquran.cloud…')
-  const arRes = await fetch('https://api.alquran.cloud/v1/quran/quran-uthmani')
-  if (!arRes.ok) throw new Error(`Arabic fetch failed: ${arRes.status}`)
-  const arData = await arRes.json()
+  const arData = await fetchWithRetry(
+    'https://api.alquran.cloud/v1/quran/quran-uthmani',
+    'Arabic text'
+  )
 
   console.log('Fetching Sahih International translation…')
-  const enRes = await fetch('https://api.alquran.cloud/v1/quran/en.sahih')
-  if (!enRes.ok) throw new Error(`English fetch failed: ${enRes.status}`)
-  const enData = await enRes.json()
+  const enData = await fetchWithRetry(
+    'https://api.alquran.cloud/v1/quran/en.sahih',
+    'English translation'
+  )
 
   const rows = []
   arData.data.surahs.forEach((surah, i) => {
@@ -93,7 +137,9 @@ async function fetchQuranData() {
     })
   })
 
-  console.log(`Loaded ${rows.length} verses from API.`)
+  // Cache locally so re-runs don't need network
+  writeFileSync(cacheFile, JSON.stringify(rows))
+  console.log(`Loaded and cached ${rows.length} verses.`)
   return rows
 }
 
@@ -136,15 +182,23 @@ async function ingest() {
 
     process.stdout.write(`Batch ${batchNum}/${totalBatches} (verses ${i + 1}–${i + batch.length})… `)
 
-    // Embed each verse in the batch
+    // Embed entire batch in ONE API call
+    const texts = batch.map(r => `${r.surah_name_en} ${r.surah_number}:${r.ayah_number} — ${r.translation}`)
+    let embeddings
+    try {
+      embeddings = await embedBatchWithRetry(texts)
+    } catch (err) {
+      console.error(`\n  Batch embed failed: ${err.message}`)
+      errorCount += batch.length
+      continue
+    }
+
     const embedded = []
-    for (const row of batch) {
-      try {
-        const text = `${row.surah_name_en} ${row.surah_number}:${row.ayah_number} — ${row.translation}`
-        row.embedding = await embedWithRetry(text)
-        embedded.push(row)
-      } catch (err) {
-        console.error(`\n  Failed to embed ${row.surah_number}:${row.ayah_number}: ${err.message}`)
+    for (let k = 0; k < batch.length; k++) {
+      if (embeddings[k]) {
+        batch[k].embedding = embeddings[k]
+        embedded.push(batch[k])
+      } else {
         errorCount++
       }
     }
