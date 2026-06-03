@@ -1,26 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Stack, router, useSegments } from 'expo-router'
-import { Session } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
 import { View, ActivityIndicator } from 'react-native'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function RootLayout() {
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { session, loading } = useAuth()
   const segments = useSegments()
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
 
   useEffect(() => {
     if (loading) return
@@ -44,7 +29,7 @@ export default function RootLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(app)" />
-      <Stack.Screen name="chat/[id]" />
+      <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
     </Stack>
   )
 }
