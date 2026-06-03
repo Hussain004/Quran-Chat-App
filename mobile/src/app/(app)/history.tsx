@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, SectionList, TouchableOpacity, RefreshControl, Alert } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ConversationSkeleton } from '@/components/Skeleton'
@@ -54,6 +55,7 @@ function formatTime(dateStr: string): string {
 }
 
 export default function HistoryScreen() {
+  const { top } = useSafeAreaInsets()
   const [sections, setSections] = useState<Section[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -104,7 +106,7 @@ export default function HistoryScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <Text style={styles.pageHeader}>History</Text>
+      <Text style={[styles.pageHeader, { paddingTop: top + 16 }]}>History</Text>
 
       {initialLoading ? (
         <View style={styles.skeletonList}>
@@ -148,7 +150,7 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1B14' },
-  pageHeader: { color: '#F8F4ED', fontSize: 28, fontWeight: '700', padding: 24, paddingTop: 64, paddingBottom: 8 },
+  pageHeader: { color: '#F8F4ED', fontSize: 28, fontWeight: '700', padding: 24, paddingBottom: 8 },
   list: { paddingHorizontal: 24, paddingBottom: 40 },
   skeletonList: { paddingHorizontal: 24, paddingTop: 12 },
 

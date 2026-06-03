@@ -3,6 +3,7 @@ import {
   View, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Text, Alert, Keyboard
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -22,6 +23,7 @@ type ChatMessage = Message & {
 const MAX_CHARS = 500
 
 export default function ChatScreen() {
+  const { top, bottom } = useSafeAreaInsets()
   const { id, initialMessage } = useLocalSearchParams<{ id: string; initialMessage?: string }>()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -171,7 +173,7 @@ export default function ChatScreen() {
       <StatusBar style="light" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: top + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
@@ -212,7 +214,7 @@ export default function ChatScreen() {
       />
 
       {/* Input Bar */}
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(bottom, 10) }]}>
         {showCounter && (
           <Text style={[styles.counter, charsLeft < 20 && styles.counterRed]}>
             {charsLeft}
@@ -250,7 +252,7 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
     borderBottomWidth: 1, borderBottomColor: '#1E3525',
   },
   backBtn: { width: 36, height: 36, justifyContent: 'center' },
@@ -260,10 +262,10 @@ const styles = StyleSheet.create({
   listContent: { paddingVertical: 16 },
 
   emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
-  emptyArabic: { color: '#C9A84C', fontSize: 26, textAlign: 'center', fontFamily: 'NoorHira', lineHeight: 48 },
+  emptyArabic: { color: '#C9A84C', fontSize: 26, textAlign: 'center', fontFamily: 'NoorHira', lineHeight: 48, writingDirection: 'rtl' },
   emptyText: { color: '#6B7280', fontSize: 15 },
 
-  inputBar: { borderTopWidth: 1, borderTopColor: '#1E3525', paddingHorizontal: 12, paddingVertical: 10, paddingBottom: Platform.OS === 'android' ? 16 : 10, backgroundColor: '#0D1B14' },
+  inputBar: { borderTopWidth: 1, borderTopColor: '#1E3525', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#0D1B14' },
   counter: { color: '#6B7280', fontSize: 12, textAlign: 'right', marginBottom: 4 },
   counterRed: { color: '#EF4444' },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },

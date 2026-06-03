@@ -1,8 +1,14 @@
 import { useEffect } from 'react'
 import { Stack, router, useSegments } from 'expo-router'
-import { View, ActivityIndicator } from 'react-native'
+import { View, ActivityIndicator, I18nManager } from 'react-native'
 import { useFonts } from 'expo-font'
+import * as SplashScreen from 'expo-splash-screen'
 import { useAuth } from '@/hooks/use-auth'
+
+// Keep Arabic text from flipping the whole layout to RTL
+I18nManager.allowRTL(false)
+
+SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
   const { session, loading } = useAuth()
@@ -10,6 +16,10 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     NoorHira: require('../../assets/fonts/NoorHira.ttf'),
   })
+
+  useEffect(() => {
+    if (!loading && fontsLoaded) SplashScreen.hideAsync()
+  }, [loading, fontsLoaded])
 
   useEffect(() => {
     if (loading) return

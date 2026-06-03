@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useState, useCallback } from 'react'
 import { ConversationSkeleton } from '@/components/Skeleton'
@@ -62,10 +63,11 @@ export default function HomeScreen() {
     router.push({ pathname: '/chat/[id]', params: { id: data.id, initialMessage: initialMessage ?? '' } })
   }
 
+  const { top } = useSafeAreaInsets()
   const firstName = displayName.split(' ')[0]
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: top + 20 }]} showsVerticalScrollIndicator={false}>
       <StatusBar style="light" />
 
       <View style={styles.header}>
@@ -154,10 +156,10 @@ function formatRelative(dateStr: string): string {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1B14' },
-  content: { padding: 24, paddingTop: 64, paddingBottom: 48 },
+  content: { padding: 24, paddingBottom: 48 },
 
   header: { alignItems: 'center', marginBottom: 28 },
-  bismillah: { color: '#C9A84C', fontSize: 26, textAlign: 'center', marginBottom: 10, fontFamily: 'NoorHira', lineHeight: 48 },
+  bismillah: { color: '#C9A84C', fontSize: 26, textAlign: 'center', marginBottom: 10, fontFamily: 'NoorHira', lineHeight: 48, writingDirection: 'rtl' },
   greeting: { color: '#F8F4ED', fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 6 },
   subtitle: { color: '#9CA3AF', fontSize: 15 },
 

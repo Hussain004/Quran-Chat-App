@@ -1,9 +1,11 @@
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 
 export default function SettingsScreen() {
+  const { top } = useSafeAreaInsets()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
 
@@ -26,7 +28,7 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <Text style={styles.header}>Settings</Text>
+      <Text style={[styles.header, { paddingTop: top + 16 }]}>Settings</Text>
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Account</Text>
@@ -53,7 +55,7 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1B14', padding: 24, paddingTop: 64 },
+  container: { flex: 1, backgroundColor: '#0D1B14', padding: 24 },
   header: { color: '#F8F4ED', fontSize: 28, fontWeight: '700', marginBottom: 32 },
   section: { marginBottom: 24, gap: 8 },
   sectionLabel: { color: '#F8F4ED', opacity: 0.5, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
