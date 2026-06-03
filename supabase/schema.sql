@@ -38,14 +38,16 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 -- Auto-create profile when a new user signs up
+-- SET search_path = '' prevents search-path injection and ensures Supabase auth's
+-- internal trigger executor (which uses a different search_path) can find the table.
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, display_name)
+  INSERT INTO public.profiles (id, display_name)
   VALUES (NEW.id, NEW.raw_user_meta_data->>'display_name');
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created

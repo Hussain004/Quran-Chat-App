@@ -5,16 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useState, useCallback } from 'react'
 import { ConversationSkeleton } from '@/components/Skeleton'
+import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 
 const SUGGESTED_QUESTIONS = [
   "What does the Quran say about patience?",
-  "Verses about gratitude and giving thanks",
   "What is the importance of prayer?",
   "The Quran on forgiveness and mercy",
-  "What does the Quran say about kindness to parents?",
-  "Verses about trust in Allah",
-  "What does the Quran say about the afterlife?",
   "The Quran on seeking knowledge",
 ]
 
@@ -87,10 +84,10 @@ export default function HomeScreen() {
         {creating ? (
           <ActivityIndicator color="#C9A84C" size="small" />
         ) : (
-          <Text style={styles.newChatIcon}>✦</Text>
+          <Ionicons name="add-circle-outline" size={22} color="#C9A84C" />
         )}
         <Text style={styles.newChatText}>New Conversation</Text>
-        {!creating && <Text style={styles.newChatArrow}>→</Text>}
+        {!creating && <Ionicons name="chevron-forward" size={20} color="#C9A84C" />}
       </TouchableOpacity>
 
       <Text style={styles.sectionLabel}>Explore Topics</Text>
@@ -169,9 +166,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2D6A4F', marginBottom: 28,
   },
   newChatBtnDisabled: { opacity: 0.65 },
-  newChatIcon: { color: '#C9A84C', fontSize: 18 },
   newChatText: { flex: 1, color: '#F8F4ED', fontSize: 16, fontWeight: '600' },
-  newChatArrow: { color: '#C9A84C', fontSize: 18 },
 
   sectionLabel: {
     color: '#9CA3AF', fontSize: 12, fontWeight: '600',

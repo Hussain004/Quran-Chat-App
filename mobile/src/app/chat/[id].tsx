@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '@/lib/supabase'
 import { sendMessage, generateTitle, type Message, type CitedVerse } from '@/lib/api'
@@ -175,7 +176,7 @@ export default function ChatScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: top + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>←</Text>
+          <Ionicons name="arrow-back" size={22} color="#C9A84C" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
         <View style={{ width: 36 }} />
@@ -239,7 +240,7 @@ export default function ChatScreen() {
             onPress={() => handleSend()}
             disabled={!input.trim() || loading}
           >
-            <Text style={styles.sendIcon}>↑</Text>
+            <Ionicons name="arrow-up" size={20} color="#1A4731" />
           </TouchableOpacity>
         </View>
       </View>
@@ -256,7 +257,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#1E3525',
   },
   backBtn: { width: 36, height: 36, justifyContent: 'center' },
-  backText: { color: '#C9A84C', fontSize: 22 },
   headerTitle: { flex: 1, color: '#F8F4ED', fontSize: 16, fontWeight: '600', textAlign: 'center', marginHorizontal: 8 },
 
   listContent: { paddingVertical: 16 },
@@ -276,5 +276,4 @@ const styles = StyleSheet.create({
   },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#C9A84C', justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { backgroundColor: '#2D4A38' },
-  sendIcon: { color: '#1A4731', fontSize: 20, fontWeight: '700' },
 })

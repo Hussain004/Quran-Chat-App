@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ConversationSkeleton } from '@/components/Skeleton'
+import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 
 type Conversation = {
@@ -114,7 +115,7 @@ export default function HistoryScreen() {
         </View>
       ) : sections.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📜</Text>
+          <Ionicons name="chatbubbles-outline" size={52} color="#4B6858" />
           <Text style={styles.emptyTitle}>No conversations yet</Text>
           <Text style={styles.emptySubtitle}>Start one from the home screen</Text>
         </View>
@@ -172,7 +173,6 @@ const styles = StyleSheet.create({
   cardArrow: { color: '#4B6858', fontSize: 22, marginLeft: 8 },
 
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  emptyIcon: { fontSize: 44, marginBottom: 4 },
-  emptyTitle: { color: '#F8F4ED', fontSize: 18, fontWeight: '600' },
+  emptyTitle: { color: '#F8F4ED', fontSize: 18, fontWeight: '600', marginTop: 4 },
   emptySubtitle: { color: '#6B7280', fontSize: 14 },
 })
