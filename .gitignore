@@ -26,6 +26,9 @@ build/
 # Generated/cached data
 scripts/quran-cache.json
 
+# Mobile app env
+mobile/.env
+
 # Misc
 .DS_Store
 *.log
@@ -39,3 +42,4 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
+mobile/node_modules
