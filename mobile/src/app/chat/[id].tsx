@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   View, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, Text, Alert, Keyboard
+  KeyboardAvoidingView, Text, Alert, Keyboard
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
@@ -13,6 +13,9 @@ import { supabase } from '@/lib/supabase'
 import { sendMessage, generateTitle, type Message, type CitedVerse } from '@/lib/api'
 import { MessageBubble } from '@/components/MessageBubble'
 import { TypingIndicator } from '@/components/TypingIndicator'
+import { useTheme } from '@/context/ThemeContext'
+import { useLanguage } from '@/context/LanguageContext'
+import type { Colors } from '@/lib/theme'
 
 type ChatMessage = Message & {
   id: string
@@ -21,25 +24,30 @@ type ChatMessage = Message & {
   failed?: boolean
 }
 
+type TypingItem = { id: string; role: 'typing'; content: string }
+type ListItem = ChatMessage | TypingItem
+
 const MAX_CHARS = 500
 
 export default function ChatScreen() {
+  const { colors } = useTheme()
+  const { language } = useLanguage()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   const { top, bottom } = useSafeAreaInsets()
   const { id, initialMessage } = useLocalSearchParams<{ id: string; initialMessage?: string }>()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState('New Conversation')
-  const listRef = useRef<FlashList<any>>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const listRef = useRef<any>(null)
   const isFirstMessage = useRef(true)
   const inputRef = useRef<TextInput>(null)
 
-  // Load existing messages
   useEffect(() => {
     loadMessages()
   }, [id])
 
-  // Auto-send if coming from a suggested question
   useEffect(() => {
     if (initialMessage && messages.length === 0) {
       setInput(initialMessage as string)
@@ -98,7 +106,7 @@ export default function ChatScreen() {
     const history = messages.filter(m => !m.failed).map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const { reply, citedVerses, lowConfidence } = await sendMessage(text, history)
+      const { reply, citedVerses, lowConfidence } = await sendMessage(text, history, language)
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
 
@@ -112,7 +120,6 @@ export default function ChatScreen() {
       setMessages(prev => [...prev, aiMsg])
       scrollToBottom()
 
-      // Save both messages to Supabase
       const { data: savedUser } = await supabase.from('messages').insert({
         conversation_id: id,
         role: 'user',
@@ -126,7 +133,6 @@ export default function ChatScreen() {
         cited_verses: citedVerses,
       }).select().single()
 
-      // Replace temp IDs with real ones
       if (savedUser && savedAi) {
         setMessages(prev => prev.map(m => {
           if (m.id === userMsg.id) return { ...m, id: savedUser.id }
@@ -135,12 +141,10 @@ export default function ChatScreen() {
         }))
       }
 
-      // Update conversation timestamp
       await supabase.from('conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', id)
 
-      // Auto-generate title on first message
       if (isFirstMessage.current) {
         isFirstMessage.current = false
         const newTitle = await generateTitle(text)
@@ -171,23 +175,20 @@ export default function ChatScreen() {
       behavior="padding"
       keyboardVerticalOffset={0}
     >
-      <StatusBar style="light" />
+      <StatusBar style={colors.statusBar} />
 
-      {/* Header */}
       <View style={[styles.header, { paddingTop: top + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color="#C9A84C" />
+          <Ionicons name="arrow-back" size={22} color={colors.accent} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Messages */}
       <FlashList
         ref={listRef}
-        data={[...messages, ...(loading ? [{ id: '__typing__', role: 'typing', content: '' }] : [])]}
-        keyExtractor={item => item.id}
-        estimatedItemSize={100}
+        data={[...messages, ...(loading ? [{ id: '__typing__', role: 'typing' as const, content: '' }] : [])] as ListItem[]}
+        keyExtractor={(item: ListItem) => item.id}
         contentContainerStyle={styles.listContent}
         onContentSizeChange={scrollToBottom}
         onScrollBeginDrag={Keyboard.dismiss}
@@ -199,22 +200,22 @@ export default function ChatScreen() {
             </View>
           ) : null
         }
-        renderItem={({ item }) => {
+        renderItem={({ item }: { item: ListItem }) => {
           if (item.role === 'typing') return <TypingIndicator />
+          const msg = item as ChatMessage
           return (
             <MessageBubble
-              role={item.role as 'user' | 'assistant'}
-              content={item.content}
-              citedVerses={item.citedVerses}
-              lowConfidence={item.lowConfidence}
-              failed={item.failed}
-              onRetry={() => retryMessage(item)}
+              role={msg.role as 'user' | 'assistant'}
+              content={msg.content}
+              citedVerses={msg.citedVerses}
+              lowConfidence={msg.lowConfidence}
+              failed={msg.failed}
+              onRetry={() => retryMessage(msg)}
             />
           )
         }}
       />
 
-      {/* Input Bar */}
       <View style={[styles.inputBar, { paddingBottom: Math.max(bottom, 10) }]}>
         {showCounter && (
           <Text style={[styles.counter, charsLeft < 20 && styles.counterRed]}>
@@ -228,7 +229,7 @@ export default function ChatScreen() {
             value={input}
             onChangeText={text => setInput(text.slice(0, MAX_CHARS))}
             placeholder="Ask about the Qur'an…"
-            placeholderTextColor="#4B6858"
+            placeholderTextColor={colors.placeholder}
             multiline
             maxLength={MAX_CHARS}
             returnKeyType="send"
@@ -240,7 +241,11 @@ export default function ChatScreen() {
             onPress={() => handleSend()}
             disabled={!input.trim() || loading}
           >
-            <Ionicons name="arrow-up" size={20} color={(!input.trim() || loading) ? '#4B6858' : '#1A4731'} />
+            <Ionicons
+              name="arrow-up"
+              size={20}
+              color={(!input.trim() || loading) ? colors.sendIconDisabled : colors.sendIconActive}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -248,32 +253,34 @@ export default function ChatScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1B14' },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: '#1E3525',
-  },
-  backBtn: { width: 36, height: 36, justifyContent: 'center' },
-  headerTitle: { flex: 1, color: '#F8F4ED', fontSize: 16, fontWeight: '600', textAlign: 'center', marginHorizontal: 8 },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingBottom: 12,
+      borderBottomWidth: 1, borderBottomColor: c.borderFaint,
+    },
+    backBtn: { width: 36, height: 36, justifyContent: 'center' },
+    headerTitle: { flex: 1, color: c.text, fontSize: 16, fontWeight: '600', textAlign: 'center', marginHorizontal: 8 },
 
-  listContent: { paddingVertical: 16 },
+    listContent: { paddingVertical: 16 },
 
-  emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
-  emptyArabic: { color: '#C9A84C', fontSize: 26, textAlign: 'center', fontFamily: 'NoorHira', lineHeight: 48, writingDirection: 'rtl' },
-  emptyText: { color: '#6B7280', fontSize: 15 },
+    emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
+    emptyArabic: { color: c.accent, fontSize: 26, textAlign: 'center', fontFamily: 'NoorHira', lineHeight: 48, writingDirection: 'rtl' },
+    emptyText: { color: c.textFaint, fontSize: 15 },
 
-  inputBar: { borderTopWidth: 1, borderTopColor: '#1E3525', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#0D1B14' },
-  counter: { color: '#6B7280', fontSize: 12, textAlign: 'right', marginBottom: 4 },
-  counterRed: { color: '#EF4444' },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  input: {
-    flex: 1, backgroundColor: '#152B1F', color: '#F8F4ED',
-    borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12,
-    fontSize: 15, maxHeight: 120, borderWidth: 1, borderColor: '#2D4A38',
-  },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#C9A84C', justifyContent: 'center', alignItems: 'center' },
-  sendBtnDisabled: { backgroundColor: '#2D4A38' },
-})
+    inputBar: { borderTopWidth: 1, borderTopColor: c.borderFaint, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: c.bg },
+    counter: { color: c.textFaint, fontSize: 12, textAlign: 'right', marginBottom: 4 },
+    counterRed: { color: '#EF4444' },
+    inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+    input: {
+      flex: 1, backgroundColor: c.inputBg, color: c.text,
+      borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12,
+      fontSize: 15, maxHeight: 120, borderWidth: 1, borderColor: c.border,
+    },
+    sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accent, justifyContent: 'center', alignItems: 'center' },
+    sendBtnDisabled: { backgroundColor: c.border },
+  })
+}

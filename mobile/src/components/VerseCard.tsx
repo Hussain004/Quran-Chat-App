@@ -1,13 +1,17 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Share } from 'react-native'
 import * as Haptics from 'expo-haptics'
+import { useTheme } from '@/context/ThemeContext'
 import type { CitedVerse } from '@/lib/api'
+import type { Colors } from '@/lib/theme'
 
 type Props = {
   verses: CitedVerse[]
 }
 
 export function VerseCard({ verses }: Props) {
+  const { colors } = useTheme()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   const [expanded, setExpanded] = useState(false)
 
   if (!verses || verses.length === 0) return null
@@ -58,17 +62,19 @@ export function VerseCard({ verses }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { marginTop: 10, backgroundColor: '#0D2218', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#1E3525' },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8 },
-  icon: { fontSize: 14 },
-  summary: { flex: 1, color: '#C9A84C', fontSize: 13, fontWeight: '500' },
-  chevron: { color: '#C9A84C', fontSize: 11 },
-  versesContainer: { borderTopWidth: 1, borderTopColor: '#1E3525', gap: 1 },
-  verseItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: '#1E3525', gap: 8 },
-  badge: { backgroundColor: '#C9A84C20', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#C9A84C40' },
-  badgeText: { color: '#C9A84C', fontSize: 12, fontWeight: '600' },
-  arabic: { color: '#F8F4ED', fontSize: 26, textAlign: 'right', lineHeight: 48, fontFamily: 'NoorHira', writingDirection: 'rtl' },
-  translation: { color: '#D1CEC8', fontSize: 13, lineHeight: 20 },
-  hint: { color: '#6B7280', fontSize: 11, textAlign: 'center', paddingVertical: 8 },
-})
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { marginTop: 10, backgroundColor: c.surfaceDeep, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: c.borderFaint },
+    header: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8 },
+    icon: { fontSize: 14 },
+    summary: { flex: 1, color: c.accent, fontSize: 13, fontWeight: '500' },
+    chevron: { color: c.accent, fontSize: 11 },
+    versesContainer: { borderTopWidth: 1, borderTopColor: c.borderFaint, gap: 1 },
+    verseItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: c.borderFaint, gap: 8 },
+    badge: { backgroundColor: c.accentBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: c.accentBorder },
+    badgeText: { color: c.accent, fontSize: 12, fontWeight: '600' },
+    arabic: { color: c.text, fontSize: 26, textAlign: 'right', lineHeight: 48, fontFamily: 'NoorHira', writingDirection: 'rtl' },
+    translation: { color: c.textSecondary, fontSize: 13, lineHeight: 20 },
+    hint: { color: c.textFaint, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
+  })
+}

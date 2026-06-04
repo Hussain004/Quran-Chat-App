@@ -1,3 +1,5 @@
+import type { AppLanguage } from '@/context/LanguageContext'
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://quran-chat-app-psi.vercel.app'
 
 export type Message = {
@@ -22,12 +24,13 @@ export type ChatResponse = {
 
 export async function sendMessage(
   message: string,
-  history: Message[]
+  history: Message[],
+  language: AppLanguage = 'en',
 ): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, language }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

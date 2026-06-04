@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { Animated, View, StyleSheet, ViewStyle } from 'react-native'
+import { useTheme } from '@/context/ThemeContext'
+import type { Colors } from '@/lib/theme'
 
 type Props = {
   width: number | `${number}%`
@@ -9,6 +11,7 @@ type Props = {
 }
 
 export function Skeleton({ width, height, borderRadius = 6, style }: Props) {
+  const { colors } = useTheme()
   const opacity = useRef(new Animated.Value(0.35)).current
 
   useEffect(() => {
@@ -22,12 +25,14 @@ export function Skeleton({ width, height, borderRadius = 6, style }: Props) {
 
   return (
     <Animated.View
-      style={[{ width, height, borderRadius, backgroundColor: '#1E3525', opacity }, style]}
+      style={[{ width, height, borderRadius, backgroundColor: colors.borderFaint, opacity }, style]}
     />
   )
 }
 
 export function ConversationSkeleton() {
+  const { colors } = useTheme()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   return (
     <View style={styles.card}>
       <View style={styles.content}>
@@ -39,12 +44,14 @@ export function ConversationSkeleton() {
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#152B1F', borderRadius: 14, padding: 16,
-    borderWidth: 1, borderColor: '#2D4A38',
-    flexDirection: 'row', alignItems: 'center',
-    marginBottom: 8,
-  },
-  content: { flex: 1 },
-})
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: c.surface, borderRadius: 14, padding: 16,
+      borderWidth: 1, borderColor: c.border,
+      flexDirection: 'row', alignItems: 'center',
+      marginBottom: 8,
+    },
+    content: { flex: 1 },
+  })
+}

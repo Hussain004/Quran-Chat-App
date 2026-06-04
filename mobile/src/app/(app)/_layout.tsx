@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router'
 import { View, Text } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTheme } from '@/context/ThemeContext'
 import type { ComponentProps } from 'react'
 
 type IoniconsName = ComponentProps<typeof Ionicons>['name']
@@ -12,10 +13,11 @@ function TabIcon({ icon, iconFocused, label, focused }: {
   label: string
   focused: boolean
 }) {
+  const { colors } = useTheme()
   return (
     <View style={{ alignItems: 'center', gap: 2, paddingTop: 8, width: 72 }}>
-      <Ionicons name={focused ? iconFocused : icon} size={24} color={focused ? '#C9A84C' : '#6B7280'} />
-      <Text numberOfLines={1} style={{ fontSize: 10, color: focused ? '#C9A84C' : '#6B7280', fontWeight: focused ? '600' : '400' }}>
+      <Ionicons name={focused ? iconFocused : icon} size={24} color={focused ? colors.accent : colors.textFaint} />
+      <Text numberOfLines={1} style={{ fontSize: 10, color: focused ? colors.accent : colors.textFaint, fontWeight: focused ? '600' : '400' }}>
         {label}
       </Text>
     </View>
@@ -24,6 +26,7 @@ function TabIcon({ icon, iconFocused, label, focused }: {
 
 export default function AppLayout() {
   const { bottom } = useSafeAreaInsets()
+  const { colors } = useTheme()
 
   return (
     <Tabs
@@ -31,8 +34,8 @@ export default function AppLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: '#0D1B14',
-          borderTopColor: '#1E3525',
+          backgroundColor: colors.bg,
+          borderTopColor: colors.borderFaint,
           borderTopWidth: 1,
           height: 64 + bottom,
           paddingBottom: bottom,

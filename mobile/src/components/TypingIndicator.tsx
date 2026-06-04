@@ -1,7 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { View, Animated, StyleSheet } from 'react-native'
+import { useTheme } from '@/context/ThemeContext'
+import type { Colors } from '@/lib/theme'
 
 export function TypingIndicator() {
+  const { colors } = useTheme()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current]
 
   useEffect(() => {
@@ -33,8 +37,10 @@ export function TypingIndicator() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { paddingHorizontal: 16, paddingVertical: 4, alignItems: 'flex-start' },
-  bubble: { backgroundColor: '#152B1F', borderRadius: 18, borderBottomLeftRadius: 4, paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', gap: 5, borderLeftWidth: 3, borderLeftColor: '#C9A84C' },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#C9A84C' },
-})
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { paddingHorizontal: 16, paddingVertical: 4, alignItems: 'flex-start' },
+    bubble: { backgroundColor: c.surface, borderRadius: 18, borderBottomLeftRadius: 4, paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', gap: 5, borderLeftWidth: 3, borderLeftColor: c.accent },
+    dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.accent },
+  })
+}

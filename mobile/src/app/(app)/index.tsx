@@ -3,10 +3,12 @@ import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { ConversationSkeleton } from '@/components/Skeleton'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import { useTheme } from '@/context/ThemeContext'
+import type { Colors } from '@/lib/theme'
 
 const SUGGESTED_QUESTIONS = [
   "What does the Quran say about patience?",
@@ -16,6 +18,8 @@ const SUGGESTED_QUESTIONS = [
 ]
 
 export default function HomeScreen() {
+  const { colors } = useTheme()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   const [conversations, setConversations] = useState<any[]>([])
   const [displayName, setDisplayName] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
@@ -65,7 +69,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: top + 20 }]} showsVerticalScrollIndicator={false}>
-      <StatusBar style="light" />
+      <StatusBar style={colors.statusBar} />
 
       <View style={styles.header}>
         <Text style={styles.bismillah}>بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</Text>
@@ -82,12 +86,12 @@ export default function HomeScreen() {
         disabled={creating}
       >
         {creating ? (
-          <ActivityIndicator color="#C9A84C" size="small" />
+          <ActivityIndicator color={colors.accent} size="small" />
         ) : (
-          <Ionicons name="add-circle-outline" size={22} color="#C9A84C" />
+          <Ionicons name="add-circle-outline" size={22} color={colors.accent} />
         )}
         <Text style={styles.newChatText}>New Conversation</Text>
-        {!creating && <Ionicons name="chevron-forward" size={20} color="#C9A84C" />}
+        {!creating && <Ionicons name="chevron-forward" size={20} color={colors.accent} />}
       </TouchableOpacity>
 
       <Text style={styles.sectionLabel}>Explore Topics</Text>
@@ -151,49 +155,51 @@ function formatRelative(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1B14' },
-  content: { padding: 24, paddingBottom: 48 },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    content: { padding: 24, paddingBottom: 48 },
 
-  header: { alignItems: 'center', marginBottom: 28 },
-  bismillah: { color: '#C9A84C', fontSize: 26, textAlign: 'center', marginBottom: 10, fontFamily: 'NoorHira', lineHeight: 48, writingDirection: 'rtl' },
-  greeting: { color: '#F8F4ED', fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 6 },
-  subtitle: { color: '#9CA3AF', fontSize: 15 },
+    header: { alignItems: 'center', marginBottom: 28 },
+    bismillah: { color: c.accent, fontSize: 26, textAlign: 'center', marginBottom: 10, fontFamily: 'NoorHira', lineHeight: 48, writingDirection: 'rtl' },
+    greeting: { color: c.text, fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 6 },
+    subtitle: { color: c.textMuted, fontSize: 15 },
 
-  newChatBtn: {
-    backgroundColor: '#1A4731', borderRadius: 16, padding: 18,
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderWidth: 1, borderColor: '#2D6A4F', marginBottom: 28,
-  },
-  newChatBtnDisabled: { opacity: 0.65 },
-  newChatText: { flex: 1, color: '#F8F4ED', fontSize: 16, fontWeight: '600' },
+    newChatBtn: {
+      backgroundColor: c.primary, borderRadius: 16, padding: 18,
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      borderWidth: 1, borderColor: c.primaryBorder, marginBottom: 28,
+    },
+    newChatBtnDisabled: { opacity: 0.65 },
+    newChatText: { flex: 1, color: '#F8F4ED', fontSize: 16, fontWeight: '600' },
 
-  sectionLabel: {
-    color: '#9CA3AF', fontSize: 12, fontWeight: '600',
-    textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12,
-  },
+    sectionLabel: {
+      color: c.textMuted, fontSize: 12, fontWeight: '600',
+      textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12,
+    },
 
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  chip: {
-    backgroundColor: '#152B1F', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderWidth: 1, borderColor: '#2D4A38',
-  },
-  chipText: { color: '#D1CEC8', fontSize: 13 },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+    chip: {
+      backgroundColor: c.surface, borderRadius: 20,
+      paddingHorizontal: 14, paddingVertical: 10,
+      borderWidth: 1, borderColor: c.border,
+    },
+    chipText: { color: c.textSecondary, fontSize: 13 },
 
-  recentSection: { marginTop: 24 },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  seeAll: { color: '#C9A84C', fontSize: 13 },
-  noRecents: { color: '#4B6858', fontSize: 14, textAlign: 'center', paddingVertical: 16 },
+    recentSection: { marginTop: 24 },
+    sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    seeAll: { color: c.accent, fontSize: 13 },
+    noRecents: { color: c.textVeryFaint, fontSize: 14, textAlign: 'center', paddingVertical: 16 },
 
-  convCard: {
-    backgroundColor: '#152B1F', borderRadius: 14, padding: 16,
-    borderWidth: 1, borderColor: '#2D4A38',
-    flexDirection: 'row', alignItems: 'center',
-    marginBottom: 10,
-  },
-  convCardInner: { flex: 1 },
-  convTitle: { color: '#F8F4ED', fontSize: 15, fontWeight: '500', marginBottom: 4 },
-  convTime: { color: '#6B7280', fontSize: 12 },
-  convArrow: { color: '#4B6858', fontSize: 22, marginLeft: 8 },
-})
+    convCard: {
+      backgroundColor: c.surface, borderRadius: 14, padding: 16,
+      borderWidth: 1, borderColor: c.border,
+      flexDirection: 'row', alignItems: 'center',
+      marginBottom: 10,
+    },
+    convCardInner: { flex: 1 },
+    convTitle: { color: c.text, fontSize: 15, fontWeight: '500', marginBottom: 4 },
+    convTime: { color: c.textFaint, fontSize: 12 },
+    convArrow: { color: c.textVeryFaint, fontSize: 22, marginLeft: 8 },
+  })
+}

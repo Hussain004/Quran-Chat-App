@@ -1,10 +1,18 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useTheme } from '@/context/ThemeContext'
+import { useLanguage, LANGUAGE_LABELS, type AppLanguage } from '@/context/LanguageContext'
+import type { Colors } from '@/lib/theme'
+
+const LANGUAGES: AppLanguage[] = ['en', 'ur', 'ar']
 
 export default function SettingsScreen() {
+  const { colors, isDark, toggleTheme } = useTheme()
+  const { language, setLanguage } = useLanguage()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   const { top } = useSafeAreaInsets()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -26,15 +34,49 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <Text style={[styles.header, { paddingTop: top + 16 }]}>Settings</Text>
+    <View style={[styles.container, { paddingTop: top + 16 }]}>
+      <StatusBar style={colors.statusBar} />
+      <Text style={styles.header}>Settings</Text>
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Account</Text>
         <View style={styles.card}>
           {displayName ? <Text style={styles.name}>{displayName}</Text> : null}
           <Text style={styles.email}>{email}</Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Appearance</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Dark Mode</Text>
+            <Switch
+              value={isDark}
+              onValueChange={toggleTheme}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={isDark ? colors.bg : colors.surface}
+            />
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Response Language</Text>
+        <View style={styles.card}>
+          {LANGUAGES.map(lang => (
+            <TouchableOpacity
+              key={lang}
+              style={[styles.langRow, lang !== LANGUAGES[LANGUAGES.length - 1] && styles.langRowBorder]}
+              onPress={() => setLanguage(lang)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.langLabel}>{LANGUAGE_LABELS[lang]}</Text>
+              {language === lang && (
+                <Text style={styles.langCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -54,15 +96,26 @@ export default function SettingsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1B14', padding: 24 },
-  header: { color: '#F8F4ED', fontSize: 28, fontWeight: '700', marginBottom: 32 },
-  section: { marginBottom: 24, gap: 8 },
-  sectionLabel: { color: '#F8F4ED', opacity: 0.5, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  card: { backgroundColor: '#152B1F', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#2D4A38', gap: 4 },
-  name: { color: '#F8F4ED', fontSize: 17, fontWeight: '600' },
-  email: { color: '#F8F4ED', opacity: 0.6, fontSize: 14 },
-  about: { color: '#F8F4ED', opacity: 0.8, fontSize: 14, lineHeight: 22 },
-  signOutBtn: { marginTop: 'auto', backgroundColor: '#3B1212', borderRadius: 12, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: '#6B2121' },
-  signOutText: { color: '#FF6B6B', fontSize: 16, fontWeight: '600' },
-})
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg, padding: 24 },
+    header: { color: c.text, fontSize: 28, fontWeight: '700', marginBottom: 32 },
+    section: { marginBottom: 24, gap: 8 },
+    sectionLabel: { color: c.text, opacity: 0.5, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+    card: { backgroundColor: c.surface, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 4, borderWidth: 1, borderColor: c.border },
+    name: { color: c.text, fontSize: 17, fontWeight: '600', paddingVertical: 12 },
+    email: { color: c.text, opacity: 0.6, fontSize: 14, paddingVertical: 12 },
+    about: { color: c.text, opacity: 0.8, fontSize: 14, lineHeight: 22, paddingVertical: 12 },
+
+    row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+    rowLabel: { color: c.text, fontSize: 15 },
+
+    langRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+    langRowBorder: { borderBottomWidth: 1, borderBottomColor: c.borderFaint },
+    langLabel: { flex: 1, color: c.text, fontSize: 15 },
+    langCheck: { color: c.accent, fontSize: 16, fontWeight: '700' },
+
+    signOutBtn: { marginTop: 'auto', backgroundColor: c.signOutBg, borderRadius: 12, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: c.signOutBorder },
+    signOutText: { color: c.signOutText, fontSize: 16, fontWeight: '600' },
+  })
+}

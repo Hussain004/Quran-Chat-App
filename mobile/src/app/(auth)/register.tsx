@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { useTheme } from '@/context/ThemeContext'
+import type { Colors } from '@/lib/theme'
 
 export default function RegisterScreen() {
+  const { colors } = useTheme()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   const { top, bottom } = useSafeAreaInsets()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -27,7 +31,7 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style={colors.statusBar} />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingTop: top + 24, paddingBottom: bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
@@ -44,14 +48,14 @@ export default function RegisterScreen() {
           <TextInput
             style={styles.input}
             placeholder="Your name"
-            placeholderTextColor="#888"
+            placeholderTextColor={colors.placeholder}
             value={name}
             onChangeText={setName}
           />
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#888"
+            placeholderTextColor={colors.placeholder}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -60,7 +64,7 @@ export default function RegisterScreen() {
           <TextInput
             style={styles.input}
             placeholder="Password (min 6 characters)"
-            placeholderTextColor="#888"
+            placeholderTextColor={colors.placeholder}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -78,17 +82,19 @@ export default function RegisterScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1B14' },
-  scroll: { flexGrow: 1, padding: 32, justifyContent: 'center' },
-  back: { marginBottom: 32 },
-  backText: { color: '#C9A84C', fontSize: 16 },
-  title: { color: '#F8F4ED', fontSize: 32, fontWeight: '700', marginBottom: 8 },
-  subtitle: { color: '#F8F4ED', opacity: 0.6, fontSize: 16, marginBottom: 40 },
-  form: { gap: 16, marginBottom: 32 },
-  input: { backgroundColor: '#152B1F', color: '#F8F4ED', borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1, borderColor: '#2D4A38' },
-  btn: { backgroundColor: '#C9A84C', borderRadius: 12, padding: 18, alignItems: 'center' },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#1A4731', fontSize: 17, fontWeight: '700' },
-  link: { color: '#C9A84C', textAlign: 'center', fontSize: 15 },
-})
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    scroll: { flexGrow: 1, padding: 32, justifyContent: 'center' },
+    back: { marginBottom: 32 },
+    backText: { color: c.accent, fontSize: 16 },
+    title: { color: c.text, fontSize: 32, fontWeight: '700', marginBottom: 8 },
+    subtitle: { color: c.text, opacity: 0.6, fontSize: 16, marginBottom: 40 },
+    form: { gap: 16, marginBottom: 32 },
+    input: { backgroundColor: c.inputBg, color: c.text, borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1, borderColor: c.border },
+    btn: { backgroundColor: c.accent, borderRadius: 12, padding: 18, alignItems: 'center' },
+    btnDisabled: { opacity: 0.6 },
+    btnText: { color: c.primary, fontSize: 17, fontWeight: '700' },
+    link: { color: c.accent, textAlign: 'center', fontSize: 15 },
+  })
+}

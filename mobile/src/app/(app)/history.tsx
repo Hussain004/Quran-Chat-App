@@ -2,11 +2,13 @@ import { View, Text, StyleSheet, SectionList, TouchableOpacity, RefreshControl, 
 import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ConversationSkeleton } from '@/components/Skeleton'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import { useTheme } from '@/context/ThemeContext'
+import type { Colors } from '@/lib/theme'
 
 type Conversation = {
   id: string
@@ -56,6 +58,8 @@ function formatTime(dateStr: string): string {
 }
 
 export default function HistoryScreen() {
+  const { colors } = useTheme()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   const { top } = useSafeAreaInsets()
   const [sections, setSections] = useState<Section[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
@@ -106,7 +110,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style={colors.statusBar} />
       <Text style={[styles.pageHeader, { paddingTop: top + 16 }]}>History</Text>
 
       {initialLoading ? (
@@ -115,7 +119,7 @@ export default function HistoryScreen() {
         </View>
       ) : sections.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubbles-outline" size={52} color="#4B6858" />
+          <Ionicons name="chatbubbles-outline" size={52} color={colors.textVeryFaint} />
           <Text style={styles.emptyTitle}>No conversations yet</Text>
           <Text style={styles.emptySubtitle}>Start one from the home screen</Text>
         </View>
@@ -125,7 +129,7 @@ export default function HistoryScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C9A84C" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
           renderSectionHeader={({ section }) => (
             <Text style={styles.sectionHeader}>{section.title}</Text>
           )}
@@ -149,30 +153,32 @@ export default function HistoryScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1B14' },
-  pageHeader: { color: '#F8F4ED', fontSize: 28, fontWeight: '700', padding: 24, paddingBottom: 8 },
-  list: { paddingHorizontal: 24, paddingBottom: 40 },
-  skeletonList: { paddingHorizontal: 24, paddingTop: 12 },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    pageHeader: { color: c.text, fontSize: 28, fontWeight: '700', padding: 24, paddingBottom: 8 },
+    list: { paddingHorizontal: 24, paddingBottom: 40 },
+    skeletonList: { paddingHorizontal: 24, paddingTop: 12 },
 
-  sectionHeader: {
-    color: '#9CA3AF', fontSize: 12, fontWeight: '600',
-    textTransform: 'uppercase', letterSpacing: 1.5,
-    marginTop: 20, marginBottom: 10,
-  },
+    sectionHeader: {
+      color: c.textMuted, fontSize: 12, fontWeight: '600',
+      textTransform: 'uppercase', letterSpacing: 1.5,
+      marginTop: 20, marginBottom: 10,
+    },
 
-  card: {
-    backgroundColor: '#152B1F', borderRadius: 14,
-    padding: 16, borderWidth: 1, borderColor: '#2D4A38',
-    flexDirection: 'row', alignItems: 'center',
-    marginBottom: 8,
-  },
-  cardContent: { flex: 1 },
-  cardTitle: { color: '#F8F4ED', fontSize: 15, fontWeight: '500', marginBottom: 4 },
-  cardTime: { color: '#6B7280', fontSize: 12 },
-  cardArrow: { color: '#4B6858', fontSize: 22, marginLeft: 8 },
+    card: {
+      backgroundColor: c.surface, borderRadius: 14,
+      padding: 16, borderWidth: 1, borderColor: c.border,
+      flexDirection: 'row', alignItems: 'center',
+      marginBottom: 8,
+    },
+    cardContent: { flex: 1 },
+    cardTitle: { color: c.text, fontSize: 15, fontWeight: '500', marginBottom: 4 },
+    cardTime: { color: c.textFaint, fontSize: 12 },
+    cardArrow: { color: c.textVeryFaint, fontSize: 22, marginLeft: 8 },
 
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  emptyTitle: { color: '#F8F4ED', fontSize: 18, fontWeight: '600', marginTop: 4 },
-  emptySubtitle: { color: '#6B7280', fontSize: 14 },
-})
+    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+    emptyTitle: { color: c.text, fontSize: 18, fontWeight: '600', marginTop: 4 },
+    emptySubtitle: { color: c.textFaint, fontSize: 14 },
+  })
+}
