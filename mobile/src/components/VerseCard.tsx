@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { View, TouchableOpacity, StyleSheet, Share } from 'react-native'
 import { Text } from '@/lib/typography'
+import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import { playAyah, stopAyah } from '@/lib/recitation'
 import { useTheme } from '@/context/ThemeContext'
 import type { CitedVerse } from '@/lib/api'
 import type { Colors } from '@/lib/theme'
@@ -13,11 +15,13 @@ type Props = {
 type VerseItemProps = {
   verse: CitedVerse
   onShare: () => void
+  isPlaying: boolean
+  onRecite: () => void
   styles: ReturnType<typeof makeStyles>
   colors: Colors
 }
 
-function VerseItem({ verse, onShare, styles, colors }: VerseItemProps) {
+function VerseItem({ verse, onShare, isPlaying, onRecite, styles, colors }: VerseItemProps) {
   const [tafseerOpen, setTafseerOpen] = useState(false)
 
   return (
@@ -26,8 +30,17 @@ function VerseItem({ verse, onShare, styles, colors }: VerseItemProps) {
       onLongPress={onShare}
       activeOpacity={0.8}
     >
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{verse.surahNameEn} {verse.surahNumber}:{verse.ayahNumber}</Text>
+      <View style={styles.verseTopRow}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{verse.surahNameEn} {verse.surahNumber}:{verse.ayahNumber}</Text>
+        </View>
+        <TouchableOpacity
+          onPress={onRecite}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.reciteBtn}
+        >
+          <Ionicons name={isPlaying ? 'pause-circle' : 'play-circle-outline'} size={24} color={colors.accent} />
+        </TouchableOpacity>
       </View>
       <Text style={styles.arabic}>{verse.arabicText}</Text>
       <Text style={styles.translation}>{verse.translation}</Text>
@@ -59,6 +72,10 @@ export function VerseCard({ verses }: Props) {
   const { colors } = useTheme()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const [expanded, setExpanded] = useState(false)
+  const [playingKey, setPlayingKey] = useState<string | null>(null)
+
+  // Stop any recitation if this card unmounts (e.g. leaving the chat).
+  useEffect(() => () => stopAyah(), [])
 
   if (!verses || verses.length === 0) return null
 
@@ -68,7 +85,25 @@ export function VerseCard({ verses }: Props) {
 
   function toggleExpand() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    setExpanded(e => !e)
+    setExpanded(e => {
+      if (e) { stopAyah(); setPlayingKey(null) }
+      return !e
+    })
+  }
+
+  function reciteVerse(verse: CitedVerse) {
+    const key = `${verse.surahNumber}:${verse.ayahNumber}`
+    if (playingKey === key) {
+      stopAyah()
+      setPlayingKey(null)
+      return
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setPlayingKey(key)
+    playAyah(verse.surahNumber, verse.ayahNumber, {
+      onDone: () => setPlayingKey(k => (k === key ? null : k)),
+      onError: () => setPlayingKey(k => (k === key ? null : k)),
+    })
   }
 
   async function shareVerse(verse: CitedVerse) {
@@ -95,11 +130,13 @@ export function VerseCard({ verses }: Props) {
               key={i}
               verse={verse}
               onShare={() => shareVerse(verse)}
+              isPlaying={playingKey === `${verse.surahNumber}:${verse.ayahNumber}`}
+              onRecite={() => reciteVerse(verse)}
               styles={styles}
               colors={colors}
             />
           ))}
-          <Text style={styles.hint}>Long press a verse to share</Text>
+          <Text style={styles.hint}>Tap play to hear the recitation, long press to share</Text>
         </View>
       )}
     </View>
@@ -115,6 +152,8 @@ function makeStyles(c: Colors) {
     chevron: { color: c.accent, fontSize: 11 },
     versesContainer: { borderTopWidth: 1, borderTopColor: c.borderFaint, gap: 1 },
     verseItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: c.borderFaint, gap: 8 },
+    verseTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    reciteBtn: { padding: 2 },
     badge: { backgroundColor: c.accentBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: c.accentBorder },
     badgeText: { color: c.accent, fontSize: 12, fontWeight: '600' },
     arabic: { color: c.text, fontSize: 26, textAlign: 'right', lineHeight: 48, fontFamily: 'NoorHira', writingDirection: 'rtl' },
