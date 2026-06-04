@@ -89,6 +89,38 @@ async function buildSearchQuery(
   }
 }
 
+// After a grounded answer, suggest a few natural next questions. Kept short and
+// in the user's language. Best-effort: any failure just yields no suggestions.
+const FOLLOWUP_PROMPT = `Based on the user's question and the assistant's answer about the Qur'an, propose exactly 3 follow-up questions the user is likely to ask next. Rules: each is a full natural question between 4 and 9 words; make them specific and varied (for example ask about a concrete example, a related virtue, or practical guidance); never use vague one or two word questions like "What is patience?". Output ONLY a JSON array of 3 strings, like ["...", "...", "..."]. No other text.`
+
+async function generateFollowUps(message: string, reply: string, language: string): Promise<string[]> {
+  try {
+    const langNote =
+      language === 'ur' ? ' Write the questions in Urdu.'
+      : language === 'ar' ? ' Write the questions in Arabic.'
+      : ''
+    const raw = await groqChat(
+      [
+        { role: 'system', content: FOLLOWUP_PROMPT + langNote },
+        { role: 'user', content: `Question: ${message}\n\nAnswer: ${reply.slice(0, 1200)}` },
+      ],
+      200,
+      0.4,
+    )
+    const start = raw.indexOf('[')
+    const end = raw.lastIndexOf(']')
+    if (start === -1 || end === -1) return []
+    const arr = JSON.parse(raw.slice(start, end + 1))
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter((x: unknown) => typeof x === 'string' && x.trim().length > 0)
+      .slice(0, 3)
+      .map((s: string) => s.trim())
+  } catch {
+    return []
+  }
+}
+
 async function embedQuery(text: string): Promise<number[]> {
   const res = await fetch('https://api.jina.ai/v1/embeddings', {
     method: 'POST',
@@ -177,6 +209,9 @@ export async function POST(req: NextRequest) {
     // "I couldn't find anything" message, which is contradictory and confusing.
     const refused = reply.trim().startsWith('I was unable to find verses')
 
+    // Suggest follow-up questions only when we actually answered.
+    const followUps = refused || lowConfidence ? [] : await generateFollowUps(message, reply, language)
+
     return NextResponse.json({
       reply,
       citedVerses: !lowConfidence && hasRelevantVerses && !refused
@@ -191,6 +226,7 @@ export async function POST(req: NextRequest) {
           }))
         : [],
       lowConfidence: lowConfidence || refused,
+      followUps,
     })
   } catch (err: any) {
     console.error('[/api/chat]', err.message)

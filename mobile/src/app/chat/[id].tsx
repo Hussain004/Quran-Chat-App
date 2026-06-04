@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   View, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Alert, Keyboard
+  KeyboardAvoidingView, Alert, Keyboard, ScrollView
 } from 'react-native'
 import type { TextInput as RNTextInput } from 'react-native'
 import { Text, TextInput } from '@/lib/typography'
@@ -24,6 +24,7 @@ type ChatMessage = Message & {
   citedVerses?: CitedVerse[]
   lowConfidence?: boolean
   failed?: boolean
+  followUps?: string[]
 }
 
 type TypingItem = { id: string; role: 'typing'; content: string }
@@ -108,7 +109,7 @@ export default function ChatScreen() {
     const history = messages.filter(m => !m.failed).map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const { reply, citedVerses, lowConfidence } = await sendMessage(text, history, language)
+      const { reply, citedVerses, lowConfidence, followUps } = await sendMessage(text, history, language)
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
 
@@ -118,6 +119,7 @@ export default function ChatScreen() {
         content: reply,
         citedVerses,
         lowConfidence,
+        followUps,
       }
       setMessages(prev => [...prev, aiMsg])
       scrollToBottom()
@@ -170,6 +172,8 @@ export default function ChatScreen() {
 
   const charsLeft = MAX_CHARS - input.length
   const showCounter = charsLeft <= 100
+  const lastMsg = messages[messages.length - 1]
+  const suggestions = !loading && lastMsg?.role === 'assistant' ? lastMsg.followUps : undefined
 
   return (
     <KeyboardAvoidingView
@@ -217,6 +221,22 @@ export default function ChatScreen() {
           )
         }}
       />
+
+      {suggestions && suggestions.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.followUpRow}
+        >
+          {suggestions.map((q, i) => (
+            <TouchableOpacity key={i} style={styles.followChip} onPress={() => handleSend(q)} activeOpacity={0.8}>
+              <Ionicons name="sparkles-outline" size={12} color={colors.accent} />
+              <Text style={styles.followChipText} numberOfLines={1}>{q}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       <View style={[styles.inputBar, { paddingBottom: Math.max(bottom, 10) }]}>
         {showCounter && (
@@ -284,5 +304,9 @@ function makeStyles(c: Colors) {
     },
     sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accent, justifyContent: 'center', alignItems: 'center' },
     sendBtnDisabled: { backgroundColor: c.border },
+
+    followUpRow: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 2, alignItems: 'center' },
+    followChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, maxWidth: 260 },
+    followChipText: { color: c.textSecondary, fontSize: 13 },
   })
 }

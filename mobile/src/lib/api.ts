@@ -21,6 +21,7 @@ export type ChatResponse = {
   reply: string
   citedVerses: CitedVerse[]
   lowConfidence: boolean
+  followUps?: string[]
 }
 
 export async function sendMessage(
