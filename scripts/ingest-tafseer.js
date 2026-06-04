@@ -1,11 +1,12 @@
 /**
  * Ingest Ibn Kathir tafseer (English) for all 6,236 ayahs into Supabase.
  *
- * Data source: spa5k/tafsir_api (jsdelivr CDN) — per-ayah Ibn Kathir entries
- * URL: https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@main/tafsir/en-tafsir-ibn-kathir/{surah}.json
+ * Uses the quran.com v4 verses endpoint with tafsirs param — this maps each
+ * individual verse to the Ibn Kathir section that covers it, giving per-ayah
+ * rows even though Ibn Kathir groups some verses into one section.
  *
- * Resumable: existing rows are skipped via ON CONFLICT DO NOTHING.
- * Run `DELETE FROM tafseer;` in Supabase SQL Editor first if re-ingesting from scratch.
+ * ~125 paginated requests total (50 verses/page), finishes in ~1 minute.
+ * Resumable: existing rows are skipped (ignoreDuplicates).
  *
  * Usage:
  *   cd scripts && node ingest-tafseer.js
@@ -33,10 +34,9 @@ try {
     const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '')
     if (!process.env[key]) process.env[key] = val
   }
-} catch { /* env not found — vars must be set in environment */ }
+} catch { /* vars must be in environment */ }
 
 const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env
-
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.error('Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_KEY')
   process.exit(1)
@@ -46,22 +46,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   realtime: { transport: ws },
 })
 
-// Ayah counts per surah (114 entries) — used to validate array lengths
-const AYAH_COUNTS = [
-  7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,
-  98,135,112,78,118,64,77,227,93,88,69,60,34,30,73,54,45,83,182,88,
-  75,85,54,53,89,59,37,35,38,29,18,45,60,49,62,55,78,96,29,22,24,13,
-  14,11,11,18,12,12,30,52,52,44,28,28,20,56,40,31,50,45,33,27,26,30,
-  20,18,32,21,18,33,16,15,27,14,27,15,21,17,18,49,33,31,13,19,17,27,
-  44,30,23,54,20,83,36,24,46,33,4,24,36,21,33,13,
-]
-
-const DELAY_MS = 200
+const TAFSEER_ID = 169   // Ibn Kathir (English) on quran.com
+const PER_PAGE   = 50
+const DELAY_MS   = 300
 const SURAH_COUNT = 114
 
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms))
-}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 function stripHtml(html) {
   return (html ?? '')
@@ -72,8 +62,10 @@ function stripHtml(html) {
     .trim()
 }
 
-async function fetchSurahTafseer(surahNumber, retries = 4) {
-  const url = `https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@main/tafsir/en-tafsir-ibn-kathir/${surahNumber}.json`
+async function fetchPage(surah, page, retries = 4) {
+  const url =
+    `https://api.quran.com/api/v4/verses/by_chapter/${surah}` +
+    `?tafsirs=${TAFSEER_ID}&per_page=${PER_PAGE}&page=${page}&fields=verse_key`
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const res = await fetch(url, { headers: { Accept: 'application/json' } })
@@ -81,84 +73,73 @@ async function fetchSurahTafseer(surahNumber, retries = 4) {
       return await res.json()
     } catch (err) {
       if (attempt === retries) throw err
-      const wait = attempt * 1500
-      console.error(`    Retry ${attempt} for surah ${surahNumber} (${err.message}) — waiting ${wait}ms`)
-      await sleep(wait)
+      await sleep(attempt * 1000)
     }
   }
 }
 
 async function ingest() {
-  console.log('=== Qur\'an Tafseer (Ibn Kathir, spa5k/tafsir_api) Ingestion ===\n')
+  console.log('=== Qur\'an Tafseer (Ibn Kathir) Ingestion ===\n')
+  console.log('Source: api.quran.com verses endpoint (per-ayah tafseer mapping)\n')
 
-  const { count: existingCount } = await supabase
-    .from('tafseer')
-    .select('*', { count: 'exact', head: true })
-  console.log(`Existing tafseer rows: ${existingCount ?? 0}`)
-  if ((existingCount ?? 0) > 0) {
-    console.log('  Tip: run DELETE FROM tafseer; in Supabase SQL Editor to start fresh.\n')
+  const { count: existing } = await supabase
+    .from('tafseer').select('*', { count: 'exact', head: true })
+  console.log(`Existing rows: ${existing ?? 0}`)
+  if ((existing ?? 0) > 0) {
+    console.log('Tip: run  DELETE FROM tafseer;  in Supabase SQL Editor to start fresh.\n')
   } else {
     console.log()
   }
 
   let totalInserted = 0
-  let totalSkipped = 0
-  let totalErrors = 0
+  let totalSkipped  = 0
+  let totalErrors   = 0
 
   for (let surah = 1; surah <= SURAH_COUNT; surah++) {
     process.stdout.write(`Surah ${String(surah).padStart(3)}/${SURAH_COUNT}… `)
 
-    let data
+    let page = 1
+    let totalPages = 1
+    const surahRows = []
+
     try {
-      data = await fetchSurahTafseer(surah)
+      while (page <= totalPages) {
+        const data = await fetchPage(surah, page)
+        totalPages = data?.pagination?.total_pages ?? 1
+
+        for (const verse of data?.verses ?? []) {
+          const [s, a] = (verse.verse_key ?? '').split(':').map(Number)
+          if (!s || !a) continue
+          const tafseerObj = verse.tafsirs?.[0]
+          const text = stripHtml(tafseerObj?.text ?? tafseerObj?.body ?? '')
+          if (!text) continue
+          surahRows.push({ surah_number: s, ayah_number: a, text, source: 'ibn-kathir' })
+        }
+
+        page++
+        if (page <= totalPages) await sleep(DELAY_MS)
+      }
     } catch (err) {
       console.error(`FAILED (${err.message})`)
       totalErrors++
       continue
     }
 
-    // The spa5k dataset has { tafsir: [{id, text}, ...] }
-    // id is the GLOBAL ayah index (1-6236), not the within-surah ayah number.
-    // We use the array position (0-indexed) as the ayah number instead,
-    // which is reliable since items are ordered by ayah within the chapter.
-    const tafsirItems = data?.tafsir ?? data?.tafsirs ?? []
-
-    if (!tafsirItems.length) {
-      console.log('(empty — skipping)')
-      totalErrors++
-      continue
-    }
-
-    const expectedAyahs = AYAH_COUNTS[surah - 1]
-    const rows = tafsirItems
-      .map((item, index) => {
-        const ayahNumber = index + 1   // 1-indexed within surah
-        const text = stripHtml(item?.text ?? '')
-        if (!text || ayahNumber > expectedAyahs) return null
-        return {
-          surah_number: surah,
-          ayah_number: ayahNumber,
-          text,
-          source: 'ibn-kathir',
-        }
-      })
-      .filter(Boolean)
-
-    if (!rows.length) {
-      console.log('(no valid rows)')
+    if (!surahRows.length) {
+      console.log('(no tafseer returned)')
       continue
     }
 
     const { error } = await supabase
       .from('tafseer')
-      .upsert(rows, { onConflict: 'surah_number,ayah_number,source', ignoreDuplicates: true })
+      .upsert(surahRows, { onConflict: 'surah_number,ayah_number,source', ignoreDuplicates: true })
 
     if (error) {
-      console.error(`ERROR: ${error.message}`)
-      totalErrors += rows.length
+      console.error(`DB ERROR: ${error.message}`)
+      totalErrors += surahRows.length
     } else {
-      totalInserted += rows.length
-      console.log(`✓ ${rows.length} ayahs`)
+      totalInserted += surahRows.length
+      console.log(`✓ ${surahRows.length} ayahs`)
     }
 
     if (surah < SURAH_COUNT) await sleep(DELAY_MS)
@@ -167,7 +148,7 @@ async function ingest() {
   console.log('\n=== Ingestion complete ===')
   console.log(`✓ Inserted: ${totalInserted}`)
   if (totalSkipped > 0) console.log(`  Skipped:  ${totalSkipped}`)
-  if (totalErrors > 0)  console.log(`✗ Errors:   ${totalErrors} chapters (re-run to retry)`)
+  if (totalErrors > 0)  console.log(`✗ Errors:   ${totalErrors} surahs (re-run to retry)`)
   console.log('\nVerify: Supabase Table Editor → tafseer → should have ~6,236 rows.')
 }
 
