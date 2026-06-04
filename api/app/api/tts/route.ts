@@ -15,9 +15,12 @@ const GEC_VERSION = '1-143.0.3650.75'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0'
 
-// A natural neural voice per supported language.
+// A natural male neural voice per supported language. Andrew is the warmest,
+// most natural-sounding English Edge voice (swap for en-US-BrianNeural or
+// en-US-ChristopherNeural for a different tone). Asad and Hamed are the
+// standard male voices for Urdu and Arabic.
 const VOICES: Record<string, { voice: string; lang: string }> = {
-  en: { voice: 'en-US-AriaNeural', lang: 'en-US' },
+  en: { voice: 'en-US-AndrewNeural', lang: 'en-US' },
   ur: { voice: 'ur-PK-AsadNeural', lang: 'ur-PK' },
   ar: { voice: 'ar-SA-HamedNeural', lang: 'ar-SA' },
 }
