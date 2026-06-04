@@ -168,8 +168,8 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       <StatusBar style="light" />
 

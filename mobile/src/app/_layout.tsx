@@ -3,6 +3,7 @@ import { Stack, router, useSegments } from 'expo-router'
 import { View, ActivityIndicator, I18nManager, Platform } from 'react-native'
 import { useFonts } from 'expo-font'
 import * as SplashScreen from 'expo-splash-screen'
+import * as SystemUI from 'expo-system-ui'
 import { useAuth } from '@/hooks/use-auth'
 
 // Keep Arabic text from flipping the whole layout to RTL
@@ -18,6 +19,9 @@ export default function RootLayout() {
   })
 
   useEffect(() => {
+    // Set the Android Activity window background so no white/grey shows
+    // through any layout gap (keyboard, nav bar, transitions)
+    SystemUI.setBackgroundColorAsync('#0D1B14').catch(() => {})
     if (Platform.OS !== 'android') return
     ;(async () => {
       try {
