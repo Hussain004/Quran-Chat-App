@@ -1,12 +1,14 @@
 /**
  * Ingest Ibn Kathir tafseer (English) for all 6,236 ayahs into Supabase.
  *
- * Uses the quran.com v4 verses endpoint with tafsirs param — this maps each
- * individual verse to the Ibn Kathir section that covers it, giving per-ayah
- * rows even though Ibn Kathir groups some verses into one section.
+ * Strategy: fetch tafseer SECTIONS from quran.com (by_chapter, ID 169),
+ * then EXPAND each section to cover every verse in its range.
+ * e.g. Al-Baqarah has 9 sections → expanded to 286 per-ayah rows.
  *
- * ~125 paginated requests total (50 verses/page), finishes in ~1 minute.
- * Resumable: existing rows are skipped (ignoreDuplicates).
+ * Verses within the same section share the same commentary text — this is
+ * correct; Ibn Kathir commented on groups of related verses together.
+ *
+ * 114 HTTP requests total. Resumable (ignoreDuplicates on upsert).
  *
  * Usage:
  *   cd scripts && node ingest-tafseer.js
@@ -46,41 +48,55 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   realtime: { transport: ws },
 })
 
-const TAFSEER_ID = 169   // Ibn Kathir (English) on quran.com
-const PER_PAGE   = 50
-const DELAY_MS   = 300
+const TAFSEER_ID  = 169   // Ibn Kathir (English, condensed) on quran.com
+const DELAY_MS    = 400
 const SURAH_COUNT = 114
+
+// Ayah counts for all 114 surahs
+const AYAH_COUNTS = [
+   7,286,200,176,120,165,206, 75,129,109,
+ 123,111, 43, 52, 99,128,111,110, 98,135,
+ 112, 78,118, 64, 77,227, 93, 88, 69, 60,
+  34, 30, 73, 54, 45, 83,182, 88, 75, 85,
+  54, 53, 89, 59, 37, 35, 38, 29, 18, 45,
+  60, 49, 62, 55, 78, 96, 29, 22, 24, 13,
+  14, 11, 11, 18, 12, 12, 30, 52, 52, 44,
+  28, 28, 20, 56, 40, 31, 50, 45, 33, 27,
+  26, 30, 20, 18, 32, 21, 18, 33, 16, 15,
+  27, 14, 27, 15, 21, 17, 18, 49, 33, 31,
+  13, 19, 17, 27, 44, 30, 23, 54, 20, 83,
+  36, 24, 46, 33,
+]
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 function stripHtml(html) {
   return (html ?? '')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ')
+    .replace(/\s+/g,' ')
     .trim()
 }
 
-async function fetchPage(surah, page, retries = 4) {
-  const url =
-    `https://api.quran.com/api/v4/verses/by_chapter/${surah}` +
-    `?tafsirs=${TAFSEER_ID}&per_page=${PER_PAGE}&page=${page}&fields=verse_key`
+async function fetchSections(surah, retries = 4) {
+  const url = `https://api.quran.com/api/v4/tafsirs/${TAFSEER_ID}/by_chapter/${surah}?fields=text`
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const res = await fetch(url, { headers: { Accept: 'application/json' } })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return await res.json()
+      const data = await res.json()
+      return data.tafsirs ?? []
     } catch (err) {
       if (attempt === retries) throw err
-      await sleep(attempt * 1000)
+      await sleep(attempt * 1500)
     }
   }
 }
 
 async function ingest() {
-  console.log('=== Qur\'an Tafseer (Ibn Kathir) Ingestion ===\n')
-  console.log('Source: api.quran.com verses endpoint (per-ayah tafseer mapping)\n')
+  console.log("=== Qur'an Tafseer (Ibn Kathir) Ingestion ===\n")
+  console.log('Strategy: fetch sections → expand each section to cover all verses in its range\n')
 
   const { count: existing } = await supabase
     .from('tafseer').select('*', { count: 'exact', head: true })
@@ -92,54 +108,72 @@ async function ingest() {
   }
 
   let totalInserted = 0
-  let totalSkipped  = 0
   let totalErrors   = 0
 
   for (let surah = 1; surah <= SURAH_COUNT; surah++) {
     process.stdout.write(`Surah ${String(surah).padStart(3)}/${SURAH_COUNT}… `)
 
-    let page = 1
-    let totalPages = 1
-    const surahRows = []
-
+    let rawSections
     try {
-      while (page <= totalPages) {
-        const data = await fetchPage(surah, page)
-        totalPages = data?.pagination?.total_pages ?? 1
-
-        for (const verse of data?.verses ?? []) {
-          const [s, a] = (verse.verse_key ?? '').split(':').map(Number)
-          if (!s || !a) continue
-          const tafseerObj = verse.tafsirs?.[0]
-          const text = stripHtml(tafseerObj?.text ?? tafseerObj?.body ?? '')
-          if (!text) continue
-          surahRows.push({ surah_number: s, ayah_number: a, text, source: 'ibn-kathir' })
-        }
-
-        page++
-        if (page <= totalPages) await sleep(DELAY_MS)
-      }
+      rawSections = await fetchSections(surah)
     } catch (err) {
       console.error(`FAILED (${err.message})`)
       totalErrors++
       continue
     }
 
-    if (!surahRows.length) {
-      console.log('(no tafseer returned)')
+    if (!rawSections.length) {
+      console.log('(no sections — skipping)')
       continue
+    }
+
+    // Parse sections into [{ayah, text}] sorted by ayah number
+    const sections = rawSections
+      .map(s => {
+        const [, a] = (s.verse_key ?? '').split(':').map(Number)
+        const text = stripHtml(s.text ?? '')
+        if (!a || !text) return null
+        return { ayah: a, text }
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.ayah - b.ayah)
+
+    if (!sections.length) {
+      console.log('(no valid sections)')
+      continue
+    }
+
+    const maxAyah = AYAH_COUNTS[surah - 1]
+    const rows = []
+
+    // Expand each section to cover every verse up to the next section start
+    for (let i = 0; i < sections.length; i++) {
+      const startAyah = sections[i].ayah
+      const endAyah   = i + 1 < sections.length
+        ? sections[i + 1].ayah - 1
+        : maxAyah
+
+      for (let ayah = startAyah; ayah <= endAyah; ayah++) {
+        rows.push({
+          surah_number: surah,
+          ayah_number:  ayah,
+          text:         sections[i].text,
+          source:       'ibn-kathir',
+        })
+      }
     }
 
     const { error } = await supabase
       .from('tafseer')
-      .upsert(surahRows, { onConflict: 'surah_number,ayah_number,source', ignoreDuplicates: true })
+      .upsert(rows, { onConflict: 'surah_number,ayah_number,source', ignoreDuplicates: true })
 
     if (error) {
       console.error(`DB ERROR: ${error.message}`)
-      totalErrors += surahRows.length
+      totalErrors += rows.length
     } else {
-      totalInserted += surahRows.length
-      console.log(`✓ ${surahRows.length} ayahs`)
+      totalInserted += rows.length
+      const sectionCount = sections.length
+      console.log(`✓ ${rows.length} ayahs (from ${sectionCount} section${sectionCount > 1 ? 's' : ''})`)
     }
 
     if (surah < SURAH_COUNT) await sleep(DELAY_MS)
@@ -147,9 +181,8 @@ async function ingest() {
 
   console.log('\n=== Ingestion complete ===')
   console.log(`✓ Inserted: ${totalInserted}`)
-  if (totalSkipped > 0) console.log(`  Skipped:  ${totalSkipped}`)
-  if (totalErrors > 0)  console.log(`✗ Errors:   ${totalErrors} surahs (re-run to retry)`)
-  console.log('\nVerify: Supabase Table Editor → tafseer → should have ~6,236 rows.')
+  if (totalErrors > 0) console.log(`✗ Errors:   ${totalErrors} surahs (re-run to retry)`)
+  console.log('\nVerify: Supabase Table Editor → tafseer → should have ~6,000+ rows.')
 }
 
 ingest().catch(err => {
