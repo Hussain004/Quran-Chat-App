@@ -1,6 +1,6 @@
 import type { AppLanguage } from '@/context/LanguageContext'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://quran-chat-app-psi.vercel.app'
+export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://quran-chat-app-psi.vercel.app'
 
 export type Message = {
   role: 'user' | 'assistant'

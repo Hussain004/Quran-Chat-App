@@ -1,14 +1,14 @@
 # Qur'an Chat
 
-An AI-powered conversational app grounded entirely in Qur'anic verses. Every answer is backed by real citations retrieved via semantic search with no hallucinated content.
+An AI-powered conversational app grounded entirely in Qur'anic verses. Every answer is backed by real citations retrieved via semantic search, with no hallucinated content.
 
 <!-- ============================================================
-     SCREENSHOTS -- place PNG files in docs/screenshots/ and
-     uncomment/update the lines below. Suggested captures:
-       welcome.png   -- Welcome / splash screen
-       home.png      -- Home screen with suggested topics
-       chat.png      -- Active chat with verse citation card open
-       history.png   -- Conversation history screen
+     SCREENSHOTS: place PNG files in docs/screenshots/ and
+     uncomment the block below. Suggested captures:
+       welcome.png   Welcome / splash screen
+       home.png      Home screen with suggested topics
+       chat.png      Active chat with verse citation card open
+       history.png   Conversation history screen
      ============================================================ -->
 
 <!--
@@ -23,14 +23,15 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
 ## Features
 
 - **Verse-grounded answers**: every reply cites the exact Qur'anic verses used to generate it
-- **Ibn Kathir tafseer**: cited verses include collapsible Ibn Kathir commentary; the LLM also draws on tafseer context to give richer, interpretation-aware answers
+- **Ibn Kathir tafseer**: cited verses include collapsible Ibn Kathir commentary, and the model weaves that commentary into its answers so it explains each verse rather than only quoting the translation
+- **Query understanding**: each question is first rewritten into a focused English search query, translating names to the spellings used in the translation (for example, Musa becomes Moses) and removing honorifics, which keeps retrieval accurate regardless of how the question is phrased
 - **Semantic search**: questions are matched by meaning, not keywords, using 768-dim embeddings over all 6,236 verses
-- **Low-confidence guard**: when no sufficiently close verses are found the app says so and shows no irrelevant citations
-- **Text-to-speech**: tap the speaker icon on any AI message to have it read aloud; tap again to stop
-- **Multi-language responses**: choose English, Urdu, or Arabic in Settings; non-English queries are translated before embedding so the retrieval stays accurate
-- **Light and dark theme**: toggle in Settings with preference saved across sessions
-- **Conversation history**: all chats persisted and grouped by recency (Today / Yesterday / This Week / Earlier)
-- **Auto-generated titles**: each conversation gets a 4-6 word title from the LLM
+- **Low-confidence guard**: when no sufficiently close verses are found, the app says so and shows no irrelevant citations
+- **Natural read-aloud**: tap Listen on any answer to hear it in a natural neural voice (free Microsoft Edge voices for English, Urdu, and Arabic), with an on-device voice as an offline fallback
+- **Multi-language responses**: choose English, Urdu, or Arabic in Settings, and answers plus citations come back in the chosen language
+- **Light and dark theme**: toggle in Settings with the preference saved across sessions
+- **Conversation history**: all chats are persisted and grouped by recency (Today, Yesterday, This Week, Earlier)
+- **Auto-generated titles**: each conversation gets a 4 to 6 word title from the LLM
 - **Islamic design**: dark green palette, gold accent, NoorHira IndoPak Arabic font for verse text
 - **Retry on failure**: failed messages can be retried with one tap
 
@@ -39,24 +40,24 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
 | Layer | Technology |
 |---|---|
 | Mobile | Expo SDK 56 / React Native 0.85, expo-router (file-based routing) |
-| Backend API | Next.js 16 on Vercel (`/api/chat`, `/api/title`) |
+| Backend API | Next.js 16 on Vercel (`/api/chat`, `/api/title`, `/api/tts`) |
 | Database | Supabase (PostgreSQL + pgvector for vector search) |
 | Embeddings | Jina AI `jina-embeddings-v2-base-en` (768 dimensions) |
 | LLM | Groq `llama-3.3-70b-versatile` |
 | Tafseer | Ibn Kathir (English) via quran.com API, stored in Supabase |
 | Auth | Supabase Auth + expo-secure-store for session persistence |
-| TTS | expo-speech (native device TTS) |
+| TTS | Microsoft Edge neural voices via `/api/tts` (free, no key), with expo-speech as fallback, played through expo-audio |
 | Build | EAS (Expo Application Services) |
 
 ## How Hallucination is Prevented
 
 The chat API follows a strict retrieval-first pipeline:
 
-1. The user's question is embedded with the same Jina model used at ingest time. For Urdu and Arabic questions, the query is first translated to English so the English-only vector index is searched with correct semantics.
-2. pgvector runs a cosine-similarity search over 6,236 pre-embedded verses, returning the top 8 matches above a threshold of 0.60.
-3. The retrieved verse texts and their Ibn Kathir tafseer snippets are injected into the LLM prompt. The model cannot answer from its training data alone.
-4. If the highest similarity score falls below 0.65, the app surfaces a low-confidence warning and returns no citations. Showing loosely-matched verses would mislead the user.
-5. The system prompt explicitly forbids the model from adding information not present in the supplied verses and tafseer.
+1. The user's question is first rewritten by the LLM into a focused English search query. This normalizes names to the spellings used in the English translation (for example, Musa becomes Moses), strips honorifics such as Hazrat and PBUH, and adds thematic keywords. The step is essential: the English-only embedder does not recognize transliterated names, so without it a question about a prophet can retrieve the wrong verses even at high similarity scores.
+2. That query is embedded with the same Jina model used at ingest time, and pgvector runs a cosine-similarity search over 6,236 pre-embedded verses, returning the top 8 matches above a threshold of 0.60.
+3. The retrieved verse texts and their Ibn Kathir tafseer are injected into the prompt as the only permitted knowledge source. The model is instructed to explain the verses using the tafseer and cannot answer from its training data.
+4. If the highest similarity score falls below 0.65, or the model decides the verses do not address the question, the app returns the standard "consult a qualified scholar" reply and shows no citations. Loosely matched verses are never displayed beneath a non-answer.
+5. The system prompt forbids the model from adding any information not present in the supplied verses and tafseer, and requires a citation in the form [Surah Name, Surah:Ayah] for every claim.
 
 Every sentence in a confident response is traceable to a specific Surah and ayah shown in the citation card below the message.
 
@@ -67,15 +68,16 @@ User device (Expo)
     |  POST /api/chat { message, history, language }
     v
 Vercel (Next.js API route)
-    |-- [if language != en] Groq  -->  translate query to English
-    |-- Jina AI              -->  embed English query (768-dim vector)
-    |-- Supabase pgvector    -->  match_verses() LEFT JOIN tafseer
-    |-- build grounded prompt (verse text + Ibn Kathir snippets)
-    +-- Groq llama-3.3-70b   -->  answer in requested language
+    |-- Groq               -->  rewrite question into an English search query
+    |-- Jina AI            -->  embed the query (768-dim vector)
+    |-- Supabase pgvector  -->  match_verses() LEFT JOIN tafseer
+    |-- build grounded prompt (verse text + Ibn Kathir tafseer)
+    +-- Groq llama-3.3-70b -->  answer in requested language, grounded in tafseer
     |  { reply, citedVerses (with tafseer), lowConfidence }
     v
 Expo app  -->  MessageBubble + VerseCard (Arabic + translation + tafseer)
-    +-- Supabase  -->  persist messages and conversation
+    |-- Listen action  -->  POST /api/tts  -->  neural MP3 played via expo-audio
+    +-- Supabase       -->  persist messages and conversation
 ```
 
 ## Project Structure
@@ -84,8 +86,9 @@ Expo app  -->  MessageBubble + VerseCard (Arabic + translation + tafseer)
 quran_chat_app/
 +-- api/                        Next.js 16 backend (deployed to Vercel)
 |   +-- app/api/
-|       +-- chat/route.ts       Main RAG pipeline (embed, retrieve, tafseer, generate)
+|       +-- chat/route.ts       Main RAG pipeline (rewrite, embed, retrieve, tafseer, generate)
 |       +-- title/route.ts      Auto-title generation
+|       +-- tts/route.ts        Neural text-to-speech (Microsoft Edge voices)
 +-- mobile/                     Expo app
 |   +-- src/
 |       +-- app/                expo-router screens
@@ -95,7 +98,7 @@ quran_chat_app/
 |       +-- components/         MessageBubble, VerseCard, TypingIndicator, Skeleton
 |       +-- context/            ThemeContext, LanguageContext
 |       +-- hooks/              use-auth
-|       +-- lib/                supabase client, API helpers, theme tokens
+|       +-- lib/                supabase client, API helpers, theme tokens, speech (TTS + fallback)
 +-- supabase/
 |   +-- schema.sql              Full DB schema (verses, tafseer, profiles, conversations, messages)
 +-- scripts/
@@ -131,7 +134,7 @@ Embeds all 6,236 verses and inserts them into Supabase. Takes roughly 10 minutes
 
 ```bash
 cd scripts
-# SUPABASE_URL and SUPABASE_SERVICE_KEY must be set -- no extra API key needed
+# SUPABASE_URL and SUPABASE_SERVICE_KEY must be set, no extra API key needed
 node ingest-tafseer.js
 ```
 
@@ -146,6 +149,8 @@ npx vercel dev                      # or deploy: npx vercel --prod
 ```
 
 Required environment variables: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `JINA_API_KEY`, `GROQ_API_KEY`
+
+The `/api/tts` route needs no extra keys. It uses the free Microsoft Edge read-aloud voices.
 
 ### 5. Mobile App
 

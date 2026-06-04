@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Share } from 'react-native'
 import * as Haptics from 'expo-haptics'
-import * as Speech from 'expo-speech'
 import { Ionicons } from '@expo/vector-icons'
 import { VerseCard } from './VerseCard'
+import { speak, stop as stopSpeech } from '@/lib/speech'
 import { useTheme } from '@/context/ThemeContext'
+import { useLanguage } from '@/context/LanguageContext'
 import type { CitedVerse } from '@/lib/api'
 import type { Colors } from '@/lib/theme'
 
@@ -19,6 +20,7 @@ type Props = {
 
 export function MessageBubble({ role, content, citedVerses, lowConfidence, failed, onRetry }: Props) {
   const { colors } = useTheme()
+  const { language } = useLanguage()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const isUser = role === 'user'
   const [speaking, setSpeaking] = useState(false)
@@ -30,17 +32,17 @@ export function MessageBubble({ role, content, citedVerses, lowConfidence, faile
 
   async function handleSpeak() {
     if (speaking) {
-      Speech.stop()
+      stopSpeech()
       setSpeaking(false)
       return
     }
-    // Strip verse citation brackets [Surah, X:Y] — they're visual markers, not for TTS
+    // Strip verse citation brackets [Surah, X:Y], they're visual markers, not for TTS
     const spoken = content.replace(/\[[^\]]+\]/g, '').trim()
+    if (!spoken) return
     setSpeaking(true)
-    Speech.speak(spoken, {
+    await speak(spoken, language, {
       onDone: () => setSpeaking(false),
       onError: () => setSpeaking(false),
-      rate: 0.9,
     })
   }
 
@@ -58,7 +60,7 @@ export function MessageBubble({ role, content, citedVerses, lowConfidence, faile
           {failed && (
             <TouchableOpacity style={styles.retryRow} onPress={onRetry}>
               <Ionicons name="refresh-outline" size={13} color={colors.errorText} />
-              <Text style={styles.retryText}>Failed — tap to retry</Text>
+              <Text style={styles.retryText}>Failed, tap to retry</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -76,25 +78,33 @@ export function MessageBubble({ role, content, citedVerses, lowConfidence, faile
           <Text style={styles.aiText}>{content}</Text>
         </TouchableOpacity>
 
-        <View style={styles.aiFooter}>
-          {lowConfidence && (
-            <View style={styles.lowConfidenceRow}>
-              <Ionicons name="warning-outline" size={13} color={colors.warningText} />
-              <Text style={styles.lowConfidenceNote}>Low confidence — consult a scholar for authoritative guidance.</Text>
-            </View>
-          )}
-          <TouchableOpacity style={styles.speakBtn} onPress={handleSpeak}>
-            <Ionicons
-              name={speaking ? 'stop-circle-outline' : 'volume-medium-outline'}
-              size={16}
-              color={speaking ? colors.accent : colors.textFaint}
-            />
-          </TouchableOpacity>
-        </View>
+        {lowConfidence && (
+          <View style={styles.lowConfidenceRow}>
+            <Ionicons name="warning-outline" size={13} color={colors.warningText} />
+            <Text style={styles.lowConfidenceNote}>Low confidence, consult a scholar for authoritative guidance.</Text>
+          </View>
+        )}
 
         {citedVerses && citedVerses.length > 0 && (
           <VerseCard verses={citedVerses} />
         )}
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={styles.speakBtn}
+            onPress={handleSpeak}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={speaking ? 'stop-circle' : 'volume-medium-outline'}
+              size={15}
+              color={speaking ? colors.accent : colors.textFaint}
+            />
+            <Text style={[styles.speakLabel, speaking && { color: colors.accent }]}>
+              {speaking ? 'Stop' : 'Listen'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   )
@@ -116,9 +126,10 @@ function makeStyles(c: Colors) {
     aiBubble: { backgroundColor: c.surface, borderRadius: 18, borderBottomLeftRadius: 4, paddingHorizontal: 16, paddingVertical: 12, borderLeftWidth: 3, borderLeftColor: c.aiBubbleBorder },
     aiText: { color: c.text, fontSize: 15, lineHeight: 24 },
 
-    aiFooter: { flexDirection: 'row', alignItems: 'center', marginTop: 4, paddingHorizontal: 4 },
-    lowConfidenceRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
+    lowConfidenceRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, paddingHorizontal: 4 },
     lowConfidenceNote: { color: c.warningText, fontSize: 12, flex: 1, opacity: 0.9 },
-    speakBtn: { padding: 4, marginLeft: 'auto' },
+    actionRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 6, paddingHorizontal: 2 },
+    speakBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 6, borderRadius: 8 },
+    speakLabel: { color: c.textFaint, fontSize: 12, fontWeight: '500' },
   })
 }
