@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native'
+import { Text } from '@/lib/typography'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
@@ -99,7 +100,7 @@ export default function SettingsScreen() {
 function makeStyles(c: Colors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg, padding: 24 },
-    header: { color: c.text, fontSize: 28, fontWeight: '700', marginBottom: 32 },
+    header: { color: c.text, fontSize: 28, fontFamily: 'Fraunces', marginBottom: 32 },
     section: { marginBottom: 24, gap: 8 },
     sectionLabel: { color: c.text, opacity: 0.5, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
     card: { backgroundColor: c.surface, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 4, borderWidth: 1, borderColor: c.border },

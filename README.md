@@ -32,7 +32,7 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
 - **Light and dark theme**: toggle in Settings with the preference saved across sessions
 - **Conversation history**: all chats are persisted and grouped by recency (Today, Yesterday, This Week, Earlier)
 - **Auto-generated titles**: each conversation gets a 4 to 6 word title from the LLM
-- **Islamic design**: dark green palette, gold accent, NoorHira IndoPak Arabic font for verse text
+- **Typography and design**: dark green palette with a gold accent, Fraunces display serif for headings and Plus Jakarta Sans for body text, and the NoorHira IndoPak Arabic font for verse text
 - **Retry on failure**: failed messages can be retried with one tap
 
 ## Tech Stack

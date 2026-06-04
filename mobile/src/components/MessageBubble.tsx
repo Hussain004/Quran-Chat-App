@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Share } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Share } from 'react-native'
+import { Text } from '@/lib/typography'
 import * as Haptics from 'expo-haptics'
 import { Ionicons } from '@expo/vector-icons'
 import { VerseCard } from './VerseCard'

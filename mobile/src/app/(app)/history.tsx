@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, SectionList, TouchableOpacity, RefreshControl, Alert } from 'react-native'
+import { View, StyleSheet, SectionList, TouchableOpacity, RefreshControl, Alert } from 'react-native'
+import { Text } from '@/lib/typography'
 import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -156,7 +157,7 @@ export default function HistoryScreen() {
 function makeStyles(c: Colors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    pageHeader: { color: c.text, fontSize: 28, fontWeight: '700', padding: 24, paddingBottom: 8 },
+    pageHeader: { color: c.text, fontSize: 28, fontFamily: 'Fraunces', padding: 24, paddingBottom: 8 },
     list: { paddingHorizontal: 24, paddingBottom: 40 },
     skeletonList: { paddingHorizontal: 24, paddingTop: 12 },
 

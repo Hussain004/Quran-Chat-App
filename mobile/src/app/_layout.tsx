@@ -28,6 +28,12 @@ function RootContent() {
   const segments = useSegments()
   const [fontsLoaded] = useFonts({
     NoorHira: require('../../assets/fonts/NoorHira.ttf'),
+    Jakarta: require('../../assets/fonts/PlusJakartaSans-Regular.ttf'),
+    'Jakarta-Medium': require('../../assets/fonts/PlusJakartaSans-Medium.ttf'),
+    'Jakarta-SemiBold': require('../../assets/fonts/PlusJakartaSans-SemiBold.ttf'),
+    'Jakarta-Bold': require('../../assets/fonts/PlusJakartaSans-Bold.ttf'),
+    Fraunces: require('../../assets/fonts/Fraunces-SemiBold.ttf'),
+    'Fraunces-Bold': require('../../assets/fonts/Fraunces-Bold.ttf'),
   })
 
   useEffect(() => {

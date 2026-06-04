@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
+import { Text } from '@/lib/typography'
 import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -120,7 +121,7 @@ export default function HomeScreen() {
             <ConversationSkeleton />
           </>
         ) : conversations.length === 0 ? (
-          <Text style={styles.noRecents}>No conversations yet — start one above</Text>
+          <Text style={styles.noRecents}>No conversations yet, start one above</Text>
         ) : (
           conversations.map(conv => (
             <TouchableOpacity
@@ -162,7 +163,7 @@ function makeStyles(c: Colors) {
 
     header: { alignItems: 'center', marginBottom: 28 },
     bismillah: { color: c.accent, fontSize: 26, textAlign: 'center', marginBottom: 10, fontFamily: 'NoorHira', lineHeight: 48, writingDirection: 'rtl' },
-    greeting: { color: c.text, fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 6 },
+    greeting: { color: c.text, fontSize: 26, fontFamily: 'Fraunces', textAlign: 'center', marginBottom: 6 },
     subtitle: { color: c.textMuted, fontSize: 15 },
 
     newChatBtn: {

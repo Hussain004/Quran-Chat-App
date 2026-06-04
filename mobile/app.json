@@ -39,7 +39,13 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/NoorHira.ttf"
+            "./assets/fonts/NoorHira.ttf",
+            "./assets/fonts/PlusJakartaSans-Regular.ttf",
+            "./assets/fonts/PlusJakartaSans-Medium.ttf",
+            "./assets/fonts/PlusJakartaSans-SemiBold.ttf",
+            "./assets/fonts/PlusJakartaSans-Bold.ttf",
+            "./assets/fonts/Fraunces-SemiBold.ttf",
+            "./assets/fonts/Fraunces-Bold.ttf"
           ]
         }
       ],

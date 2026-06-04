@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Share } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Share } from 'react-native'
+import { Text } from '@/lib/typography'
 import * as Haptics from 'expo-haptics'
 import { useTheme } from '@/context/ThemeContext'
 import type { CitedVerse } from '@/lib/api'

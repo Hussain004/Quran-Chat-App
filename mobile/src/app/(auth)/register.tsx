@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native'
+import { Text, TextInput } from '@/lib/typography'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -88,10 +89,10 @@ function makeStyles(c: Colors) {
     scroll: { flexGrow: 1, padding: 32, justifyContent: 'center' },
     back: { marginBottom: 32 },
     backText: { color: c.accent, fontSize: 16 },
-    title: { color: c.text, fontSize: 32, fontWeight: '700', marginBottom: 8 },
+    title: { color: c.text, fontSize: 32, fontFamily: 'Fraunces', marginBottom: 8 },
     subtitle: { color: c.text, opacity: 0.6, fontSize: 16, marginBottom: 40 },
     form: { gap: 16, marginBottom: 32 },
-    input: { backgroundColor: c.inputBg, color: c.text, borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1, borderColor: c.border },
+    input: { backgroundColor: c.inputBg, color: c.text, fontFamily: 'Jakarta', borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1, borderColor: c.border },
     btn: { backgroundColor: c.accent, borderRadius: 12, padding: 18, alignItems: 'center' },
     btnDisabled: { opacity: 0.6 },
     btnText: { color: c.primary, fontSize: 17, fontWeight: '700' },

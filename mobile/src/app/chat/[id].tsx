@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
-  View, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Text, Alert, Keyboard
+  View, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Alert, Keyboard
 } from 'react-native'
+import type { TextInput as RNTextInput } from 'react-native'
+import { Text, TextInput } from '@/lib/typography'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router } from 'expo-router'
@@ -42,7 +44,7 @@ export default function ChatScreen() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const listRef = useRef<any>(null)
   const isFirstMessage = useRef(true)
-  const inputRef = useRef<TextInput>(null)
+  const inputRef = useRef<RNTextInput>(null)
 
   useEffect(() => {
     loadMessages()
@@ -276,7 +278,7 @@ function makeStyles(c: Colors) {
     counterRed: { color: '#EF4444' },
     inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
     input: {
-      flex: 1, backgroundColor: c.inputBg, color: c.text,
+      flex: 1, backgroundColor: c.inputBg, color: c.text, fontFamily: 'Jakarta',
       borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12,
       fontSize: 15, maxHeight: 120, borderWidth: 1, borderColor: c.border,
     },
