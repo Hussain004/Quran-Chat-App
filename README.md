@@ -1,6 +1,6 @@
 # Qur'an Chat
 
-An AI-powered conversational app grounded entirely in Qur'anic verses. Every answer is backed by real citations retrieved via semantic search — no hallucinated content.
+An AI-powered conversational app grounded entirely in Qur'anic verses. Every answer is backed by real citations retrieved via semantic search with no hallucinated content.
 
 <!-- ============================================================
      SCREENSHOTS — place PNG files in docs/screenshots/ and
@@ -22,13 +22,13 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
 
 ## Features
 
-- **Verse-grounded answers** — every reply cites the exact Qur'anic verses used to generate it
-- **Semantic search** — questions are matched by meaning, not keywords, using 768-dim embeddings over all 6,236 verses
-- **Low-confidence guard** — when no sufficiently close verses are found the app says so instead of guessing
-- **Conversation history** — all chats are persisted and grouped by recency (Today / Yesterday / This Week / Earlier)
-- **Auto-generated titles** — each conversation gets a 4–6 word title produced by the LLM
-- **Islamic design** — dark green palette (`#0D1B14`), gold accent (`#C9A84C`), NoorHira IndoPak Arabic font for verse text
-- **Offline-resilient** — failed messages can be retried with one tap
+- **Verse-grounded answers**: every reply cites the exact Qur'anic verses used to generate it
+- **Semantic search**: questions are matched by meaning, not keywords, using 768-dim embeddings over all 6,236 verses
+- **Low-confidence guard**: when no sufficiently close verses are found the app says so instead of guessing
+- **Conversation history**: all chats are persisted and grouped by recency (Today / Yesterday / This Week / Earlier)
+- **Auto-generated titles**: each conversation gets a 4–6 word title produced by the LLM
+- **Islamic design**: dark green palette (`#0D1B14`), gold accent (`#C9A84C`), NoorHira IndoPak Arabic font for verse text
+- **Offline-resilient**: failed messages can be retried with one tap
 
 ## Tech Stack
 
@@ -48,7 +48,7 @@ The chat API follows a strict retrieval-first pipeline:
 
 1. The user's question is embedded with the same Jina model used at ingest time.
 2. `pgvector` runs a cosine-similarity search over 6,236 pre-embedded verses, returning the top 8 matches above a threshold of **0.60**.
-3. Only the retrieved verse texts are injected into the LLM prompt — the model cannot answer from its training data alone.
+3. Only the retrieved verse texts are injected into the LLM prompt so that the model cannot answer from its training data alone.
 4. If the highest similarity score falls below 0.60, the app surfaces a **low-confidence warning** in the UI rather than presenting a potentially unfounded answer.
 5. The system prompt explicitly forbids the model from adding information not present in the supplied verses.
 
