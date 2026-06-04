@@ -3,7 +3,6 @@ import { Stack, router, useSegments } from 'expo-router'
 import { View, ActivityIndicator, I18nManager, Platform } from 'react-native'
 import { useFonts } from 'expo-font'
 import * as SplashScreen from 'expo-splash-screen'
-import * as NavigationBar from 'expo-navigation-bar'
 import { useAuth } from '@/hooks/use-auth'
 
 // Keep Arabic text from flipping the whole layout to RTL
@@ -19,10 +18,15 @@ export default function RootLayout() {
   })
 
   useEffect(() => {
-    if (Platform.OS === 'android') {
-      NavigationBar.setBackgroundColorAsync('#0D1B14')
-      NavigationBar.setButtonStyleAsync('light')
-    }
+    if (Platform.OS !== 'android') return
+    ;(async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const NavBar = require('expo-navigation-bar')
+        await NavBar.setBackgroundColorAsync('#0D1B14')
+        await NavBar.setButtonStyleAsync('light')
+      } catch {}
+    })()
   }, [])
 
   useEffect(() => {
@@ -32,9 +36,12 @@ export default function RootLayout() {
   useEffect(() => {
     if (loading) return
     const inAuthGroup = segments[0] === '(auth)'
+    const inAppGroup = segments[0] === '(app)'
+    const inChatGroup = segments[0] === 'chat'
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/welcome')
-    } else if (session && inAuthGroup) {
+    } else if (session && !inAppGroup && !inChatGroup) {
+      // covers: arriving from auth screens OR from root index on relaunch
       router.replace('/(app)')
     }
   }, [session, segments, loading])
