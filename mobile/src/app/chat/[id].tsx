@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '@/lib/supabase'
 import { sendMessage, generateTitle, type Message, type CitedVerse } from '@/lib/api'
+import { addBookmark, removeBookmark, getBookmarkedMessageIds } from '@/lib/bookmarks'
 import { MessageBubble } from '@/components/MessageBubble'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { useTheme } from '@/context/ThemeContext'
@@ -42,6 +43,7 @@ export default function ChatScreen() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState('New Conversation')
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const listRef = useRef<any>(null)
   const isFirstMessage = useRef(true)
@@ -83,6 +85,29 @@ export default function ChatScreen() {
         lowConfidence: false,
       })))
       isFirstMessage.current = false
+      const assistantIds = data.filter(m => m.role === 'assistant').map(m => m.id)
+      getBookmarkedMessageIds(assistantIds).then(setBookmarkedIds).catch(() => {})
+    }
+  }
+
+  async function toggleBookmark(msg: ChatMessage) {
+    if (!msg.id || msg.id.startsWith('temp')) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    const isSaved = bookmarkedIds.has(msg.id)
+    setBookmarkedIds(prev => {
+      const next = new Set(prev)
+      if (isSaved) next.delete(msg.id); else next.add(msg.id)
+      return next
+    })
+    try {
+      if (isSaved) await removeBookmark(msg.id)
+      else await addBookmark(msg.id, msg.content, msg.citedVerses)
+    } catch {
+      setBookmarkedIds(prev => {
+        const next = new Set(prev)
+        if (isSaved) next.add(msg.id); else next.delete(msg.id)
+        return next
+      })
     }
   }
 
@@ -217,6 +242,8 @@ export default function ChatScreen() {
               lowConfidence={msg.lowConfidence}
               failed={msg.failed}
               onRetry={() => retryMessage(msg)}
+              bookmarked={bookmarkedIds.has(msg.id)}
+              onToggleBookmark={msg.role === 'assistant' && !msg.id.startsWith('temp') ? () => toggleBookmark(msg) : undefined}
             />
           )
         }}

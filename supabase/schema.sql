@@ -156,3 +156,26 @@ CREATE POLICY "messages_own" ON messages
 
 -- verses table is read-only for all authenticated users (no RLS needed for reads)
 -- The service key bypasses RLS for the ingest script
+
+-- -------------------------------------------------------
+-- Bookmarks (saved answers)
+-- Stores a snapshot of the answer so it survives message/conversation deletion.
+-- message_id is kept for toggle/dedupe and set to NULL if the source is deleted.
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id      UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  message_id   UUID REFERENCES messages(id) ON DELETE SET NULL,
+  content      TEXT NOT NULL,
+  cited_verses JSONB DEFAULT '[]'::jsonb,
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, message_id)
+);
+
+CREATE INDEX IF NOT EXISTS bookmarks_user_idx ON bookmarks(user_id, created_at DESC);
+
+ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
+
+-- Bookmarks: users can only access their own
+CREATE POLICY "bookmarks_own" ON bookmarks
+  USING (auth.uid() = user_id);

@@ -50,6 +50,12 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="saved"
+        options={{
+          tabBarIcon: ({ focused }) => <TabIcon icon="bookmark-outline" iconFocused="bookmark" label="Saved" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="history"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon icon="time-outline" iconFocused="time" label="History" focused={focused} />,

@@ -17,9 +17,11 @@ type Props = {
   lowConfidence?: boolean
   failed?: boolean
   onRetry?: () => void
+  bookmarked?: boolean
+  onToggleBookmark?: () => void
 }
 
-export function MessageBubble({ role, content, citedVerses, lowConfidence, failed, onRetry }: Props) {
+export function MessageBubble({ role, content, citedVerses, lowConfidence, failed, onRetry, bookmarked, onToggleBookmark }: Props) {
   const { colors } = useTheme()
   const { language } = useLanguage()
   const styles = useMemo(() => makeStyles(colors), [colors])
@@ -91,6 +93,22 @@ export function MessageBubble({ role, content, citedVerses, lowConfidence, faile
         )}
 
         <View style={styles.actionRow}>
+          {onToggleBookmark && (
+            <TouchableOpacity
+              style={styles.speakBtn}
+              onPress={onToggleBookmark}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+                size={15}
+                color={bookmarked ? colors.accent : colors.textFaint}
+              />
+              <Text style={[styles.speakLabel, bookmarked && { color: colors.accent }]}>
+                {bookmarked ? 'Saved' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.speakBtn}
             onPress={handleSpeak}
@@ -129,7 +147,7 @@ function makeStyles(c: Colors) {
 
     lowConfidenceRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, paddingHorizontal: 4 },
     lowConfidenceNote: { color: c.warningText, fontSize: 12, flex: 1, opacity: 0.9 },
-    actionRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 6, paddingHorizontal: 2 },
+    actionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 14, marginTop: 6, paddingHorizontal: 2 },
     speakBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 6, borderRadius: 8 },
     speakLabel: { color: c.textFaint, fontSize: 12, fontWeight: '500' },
   })
