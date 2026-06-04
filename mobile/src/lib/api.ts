@@ -14,6 +14,7 @@ export type CitedVerse = {
   arabicText: string
   translation: string
   similarity: number
+  tafseer: string | null
 }
 
 export type ChatResponse = {

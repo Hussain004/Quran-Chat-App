@@ -79,7 +79,24 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- -------------------------------------------------------
--- RPC: vector similarity search over verses
+-- Tafseer (Ibn Kathir, English) — one row per ayah
+-- No embeddings needed; looked up by (surah_number, ayah_number)
+-- Run scripts/ingest-tafseer.js to populate.
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tafseer (
+  id           BIGSERIAL PRIMARY KEY,
+  surah_number SMALLINT NOT NULL,
+  ayah_number  SMALLINT NOT NULL,
+  text         TEXT NOT NULL,
+  source       TEXT DEFAULT 'ibn-kathir',
+  UNIQUE(surah_number, ayah_number, source)
+);
+
+CREATE INDEX IF NOT EXISTS tafseer_lookup_idx ON tafseer(surah_number, ayah_number);
+
+-- -------------------------------------------------------
+-- RPC: vector similarity search over verses + tafseer join
+-- tafseer_text is NULL until ingest-tafseer.js has been run
 -- -------------------------------------------------------
 CREATE OR REPLACE FUNCTION match_verses(
   query_embedding vector(768),
@@ -93,7 +110,8 @@ RETURNS TABLE (
   arabic_text   TEXT,
   translation   TEXT,
   surah_name_en TEXT,
-  similarity    FLOAT
+  similarity    FLOAT,
+  tafseer_text  TEXT
 ) LANGUAGE sql STABLE AS $$
   SELECT
     v.id,
@@ -102,8 +120,12 @@ RETURNS TABLE (
     v.arabic_text,
     v.translation,
     v.surah_name_en,
-    1 - (v.embedding <=> query_embedding) AS similarity
+    1 - (v.embedding <=> query_embedding) AS similarity,
+    t.text AS tafseer_text
   FROM verses v
+  LEFT JOIN tafseer t
+    ON t.surah_number = v.surah_number
+   AND t.ayah_number  = v.ayah_number
   WHERE 1 - (v.embedding <=> query_embedding) > match_threshold
   ORDER BY similarity DESC
   LIMIT match_count;

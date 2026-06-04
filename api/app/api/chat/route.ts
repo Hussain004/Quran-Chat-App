@@ -11,12 +11,13 @@ const supabase = createClient(
 const BASE_SYSTEM_PROMPT = `You are a respectful Islamic assistant. Your sole purpose is to help users understand the Qur'an.
 
 STRICT RULES — follow these absolutely:
-1. Answer ONLY using the Qur'anic verses provided in the context below. Do not use any other knowledge.
-2. Every factual claim MUST cite a verse as [Surah Name, Surah:Ayah] — e.g., [Al-Baqarah, 2:286].
-3. If the provided verses do not contain a clear answer, say exactly: "I was unable to find verses that directly address this question. For a more complete answer, please consult a qualified Islamic scholar."
-4. Never speculate, extrapolate, or add interpretation beyond what the provided verses explicitly state.
-5. Maintain a tone that is respectful, humble, and reverent.
-6. Never say anything disrespectful to the Qur'an, the Prophet ﷺ, or Islam.`
+1. Answer ONLY using the Qur'anic verses and their Tafseer (Ibn Kathir's commentary) provided in the context below. Do not use any other knowledge.
+2. Every factual claim MUST cite the verse as [Surah Name, Surah:Ayah] — e.g., [Al-Baqarah, 2:286].
+3. You MAY draw on the Tafseer to give deeper context and interpretation, but you must still cite the verse reference.
+4. If the provided verses do not contain a clear answer, say exactly: "I was unable to find verses that directly address this question. For a more complete answer, please consult a qualified Islamic scholar."
+5. Never speculate, extrapolate, or add interpretation beyond what the provided verses and Tafseer explicitly state.
+6. Maintain a tone that is respectful, humble, and reverent.
+7. Never say anything disrespectful to the Qur'an, the Prophet ﷺ, or Islam.`
 
 const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
   ur: 'IMPORTANT: Write your entire response in Urdu script (اردو). All text including citations must be in Urdu.',
@@ -99,10 +100,20 @@ export async function POST(req: NextRequest) {
       : 0
     const lowConfidence = maxSimilarity < 0.65
 
-    // 4. Build grounded context
+    // 4. Build grounded context — include tafseer snippet when available
+    const TAFSEER_SNIPPET = 500  // chars of Ibn Kathir to inject per verse
     const verseContext = hasRelevantVerses && !lowConfidence
       ? verses
-          .map((v: any) => `[${v.surah_name_en}, ${v.surah_number}:${v.ayah_number}]\n${v.translation}`)
+          .map((v: any) => {
+            let entry = `[${v.surah_name_en}, ${v.surah_number}:${v.ayah_number}]\n${v.translation}`
+            if (v.tafseer_text) {
+              const snippet = v.tafseer_text.length > TAFSEER_SNIPPET
+                ? v.tafseer_text.slice(0, TAFSEER_SNIPPET) + '…'
+                : v.tafseer_text
+              entry += `\nTafseer (Ibn Kathir): ${snippet}`
+            }
+            return entry
+          })
           .join('\n\n')
       : 'No relevant verses found.'
 
@@ -135,6 +146,7 @@ export async function POST(req: NextRequest) {
             arabicText: v.arabic_text,
             translation: v.translation,
             similarity: v.similarity,
+            tafseer: v.tafseer_text ?? null,
           }))
         : [],
       lowConfidence,
