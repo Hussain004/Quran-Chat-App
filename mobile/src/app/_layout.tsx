@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Stack, router, useSegments } from 'expo-router'
-import { View, ActivityIndicator, I18nManager, Platform } from 'react-native'
+import { View, ActivityIndicator, I18nManager, Platform, StyleSheet } from 'react-native'
 import { useFonts } from 'expo-font'
 import * as SplashScreen from 'expo-splash-screen'
 import * as SystemUI from 'expo-system-ui'
@@ -59,10 +59,16 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(app)" />
-      <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
-    </Stack>
+    <View style={styles.root}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(app)" />
+        <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
+      </Stack>
+    </View>
   )
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#0D1B14' },
+})
