@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
-import { View, TouchableOpacity, StyleSheet, Share, Modal, ScrollView, ActivityIndicator } from 'react-native'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { View, TouchableOpacity, StyleSheet, Modal, ScrollView, ActivityIndicator } from 'react-native'
+import { captureRef } from 'react-native-view-shot'
+import * as Sharing from 'expo-sharing'
 import { Text } from '@/lib/typography'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
@@ -85,9 +87,31 @@ export function VerseCard({ verses }: Props) {
   const [playingKey, setPlayingKey] = useState<string | null>(null)
   const [contextTarget, setContextTarget] = useState<CitedVerse | null>(null)
   const [contextVerses, setContextVerses] = useState<ContextVerse[] | null>(null)
+  const [shareVerseData, setShareVerseData] = useState<CitedVerse | null>(null)
+  const shotRef = useRef<View>(null)
 
   // Stop any recitation if this card unmounts (e.g. leaving the chat).
   useEffect(() => () => stopAyah(), [])
+
+  // When a verse is queued for sharing, capture the off-screen branded card to
+  // an image and open the share sheet, then clear it.
+  useEffect(() => {
+    if (!shareVerseData) return
+    let cancelled = false
+    const t = setTimeout(async () => {
+      try {
+        const uri = await captureRef(shotRef, { format: 'png', quality: 1 })
+        if (!cancelled && (await Sharing.isAvailableAsync())) {
+          await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share verse' })
+        }
+      } catch {
+        // ignore capture or share failures
+      } finally {
+        if (!cancelled) setShareVerseData(null)
+      }
+    }, 150)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [shareVerseData])
 
   if (!verses || verses.length === 0) return null
 
@@ -118,11 +142,9 @@ export function VerseCard({ verses }: Props) {
     })
   }
 
-  async function shareVerse(verse: CitedVerse) {
+  function shareImage(verse: CitedVerse) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    await Share.share({
-      message: `${verse.arabicText}\n\n"${verse.translation}"\n\n— ${verse.surahNameEn} ${verse.surahNumber}:${verse.ayahNumber}`,
-    })
+    setShareVerseData(verse)
   }
 
   function openContext(verse: CitedVerse) {
@@ -155,7 +177,7 @@ export function VerseCard({ verses }: Props) {
             <VerseItem
               key={i}
               verse={verse}
-              onShare={() => shareVerse(verse)}
+              onShare={() => shareImage(verse)}
               isPlaying={playingKey === `${verse.surahNumber}:${verse.ayahNumber}`}
               onRecite={() => reciteVerse(verse)}
               onContext={() => openContext(verse)}
@@ -163,7 +185,7 @@ export function VerseCard({ verses }: Props) {
               colors={colors}
             />
           ))}
-          <Text style={styles.hint}>Tap play to hear the recitation, long press to share</Text>
+          <Text style={styles.hint}>Tap play to hear the recitation, long press to share as an image</Text>
         </View>
       )}
 
@@ -197,6 +219,19 @@ export function VerseCard({ verses }: Props) {
           </View>
         </View>
       </Modal>
+
+      {shareVerseData && (
+        <View style={styles.shotWrap} pointerEvents="none">
+          <View ref={shotRef} collapsable={false} style={styles.shareCard}>
+            <Text style={styles.shareRef}>{shareVerseData.surahNameEn} {shareVerseData.surahNumber}:{shareVerseData.ayahNumber}</Text>
+            <Text style={styles.shareArabic}>{shareVerseData.arabicText}</Text>
+            <Text style={styles.shareTranslation}>{shareVerseData.translation}</Text>
+            <View style={styles.shareFooter}>
+              <Text style={styles.shareBrand}>Qur'an Chat</Text>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   )
 }
@@ -232,5 +267,15 @@ function makeStyles(c: Colors) {
     ctxVerse: { gap: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.borderFaint },
     ctxVerseFocal: { backgroundColor: c.surface, borderRadius: 12, padding: 12, borderBottomWidth: 0, borderLeftWidth: 3, borderLeftColor: c.accent },
     ctxAyahNum: { color: c.accent, fontSize: 12, fontWeight: '600' },
+
+    // Off-screen branded card captured for image sharing (fixed palette so the
+    // shared image always looks the same regardless of the in-app theme).
+    shotWrap: { position: 'absolute', left: -9999, top: 0 },
+    shareCard: { width: 360, backgroundColor: '#0D1B14', padding: 28, gap: 18, borderWidth: 1, borderColor: '#2D4A38' },
+    shareRef: { color: '#C9A84C', fontSize: 15, fontFamily: 'Fraunces' },
+    shareArabic: { color: '#F8F4ED', fontSize: 30, lineHeight: 58, textAlign: 'right', fontFamily: 'NoorHira', writingDirection: 'rtl' },
+    shareTranslation: { color: '#D8D2C8', fontSize: 16, lineHeight: 26 },
+    shareFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, borderTopWidth: 1, borderTopColor: '#2D4A38', paddingTop: 14 },
+    shareBrand: { color: '#C9A84C', fontSize: 14, fontFamily: 'Fraunces' },
   })
 }
