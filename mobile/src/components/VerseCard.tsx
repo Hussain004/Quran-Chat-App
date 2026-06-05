@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
-import { View, TouchableOpacity, StyleSheet, Share } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Share, Modal, ScrollView, ActivityIndicator } from 'react-native'
 import { Text } from '@/lib/typography'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { playAyah, stopAyah } from '@/lib/recitation'
 import { useTheme } from '@/context/ThemeContext'
-import type { CitedVerse } from '@/lib/api'
+import { fetchVerseContext, type CitedVerse, type ContextVerse } from '@/lib/api'
 import type { Colors } from '@/lib/theme'
 
 type Props = {
@@ -17,11 +17,12 @@ type VerseItemProps = {
   onShare: () => void
   isPlaying: boolean
   onRecite: () => void
+  onContext: () => void
   styles: ReturnType<typeof makeStyles>
   colors: Colors
 }
 
-function VerseItem({ verse, onShare, isPlaying, onRecite, styles, colors }: VerseItemProps) {
+function VerseItem({ verse, onShare, isPlaying, onRecite, onContext, styles, colors }: VerseItemProps) {
   const [tafseerOpen, setTafseerOpen] = useState(false)
 
   return (
@@ -34,13 +35,22 @@ function VerseItem({ verse, onShare, isPlaying, onRecite, styles, colors }: Vers
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{verse.surahNameEn} {verse.surahNumber}:{verse.ayahNumber}</Text>
         </View>
-        <TouchableOpacity
-          onPress={onRecite}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={styles.reciteBtn}
-        >
-          <Ionicons name={isPlaying ? 'pause-circle' : 'play-circle-outline'} size={24} color={colors.accent} />
-        </TouchableOpacity>
+        <View style={styles.verseActions}>
+          <TouchableOpacity
+            onPress={onContext}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={styles.reciteBtn}
+          >
+            <Ionicons name="book-outline" size={19} color={colors.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onRecite}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={styles.reciteBtn}
+          >
+            <Ionicons name={isPlaying ? 'pause-circle' : 'play-circle-outline'} size={24} color={colors.accent} />
+          </TouchableOpacity>
+        </View>
       </View>
       <Text style={styles.arabic}>{verse.arabicText}</Text>
       <Text style={styles.translation}>{verse.translation}</Text>
@@ -73,6 +83,8 @@ export function VerseCard({ verses }: Props) {
   const styles = useMemo(() => makeStyles(colors), [colors])
   const [expanded, setExpanded] = useState(false)
   const [playingKey, setPlayingKey] = useState<string | null>(null)
+  const [contextTarget, setContextTarget] = useState<CitedVerse | null>(null)
+  const [contextVerses, setContextVerses] = useState<ContextVerse[] | null>(null)
 
   // Stop any recitation if this card unmounts (e.g. leaving the chat).
   useEffect(() => () => stopAyah(), [])
@@ -113,6 +125,20 @@ export function VerseCard({ verses }: Props) {
     })
   }
 
+  function openContext(verse: CitedVerse) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setContextTarget(verse)
+    setContextVerses(null)
+    fetchVerseContext(verse.surahNumber, verse.ayahNumber, 3)
+      .then(setContextVerses)
+      .catch(() => setContextVerses([]))
+  }
+
+  function closeContext() {
+    setContextTarget(null)
+    setContextVerses(null)
+  }
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.header} onPress={toggleExpand} activeOpacity={0.7}>
@@ -132,6 +158,7 @@ export function VerseCard({ verses }: Props) {
               onShare={() => shareVerse(verse)}
               isPlaying={playingKey === `${verse.surahNumber}:${verse.ayahNumber}`}
               onRecite={() => reciteVerse(verse)}
+              onContext={() => openContext(verse)}
               styles={styles}
               colors={colors}
             />
@@ -139,6 +166,37 @@ export function VerseCard({ verses }: Props) {
           <Text style={styles.hint}>Tap play to hear the recitation, long press to share</Text>
         </View>
       )}
+
+      <Modal visible={!!contextTarget} transparent animationType="slide" onRequestClose={closeContext}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {contextTarget ? `${contextTarget.surahNameEn} ${contextTarget.surahNumber}` : ''}
+              </Text>
+              <TouchableOpacity onPress={closeContext} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            {contextVerses === null ? (
+              <ActivityIndicator color={colors.accent} style={styles.modalLoading} />
+            ) : (
+              <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                {contextVerses.map(v => {
+                  const focal = !!contextTarget && v.ayahNumber === contextTarget.ayahNumber
+                  return (
+                    <View key={v.ayahNumber} style={[styles.ctxVerse, focal && styles.ctxVerseFocal]}>
+                      <Text style={styles.ctxAyahNum}>{v.surahNumber}:{v.ayahNumber}</Text>
+                      <Text style={styles.arabic}>{v.arabicText}</Text>
+                      <Text style={styles.translation}>{v.translation}</Text>
+                    </View>
+                  )
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -153,6 +211,7 @@ function makeStyles(c: Colors) {
     versesContainer: { borderTopWidth: 1, borderTopColor: c.borderFaint, gap: 1 },
     verseItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: c.borderFaint, gap: 8 },
     verseTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    verseActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     reciteBtn: { padding: 2 },
     badge: { backgroundColor: c.accentBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: c.accentBorder },
     badgeText: { color: c.accent, fontSize: 12, fontWeight: '600' },
@@ -163,5 +222,15 @@ function makeStyles(c: Colors) {
     tafseerToggleText: { color: c.accent, fontSize: 12, fontWeight: '500', opacity: 0.85 },
     tafseerText: { color: c.textMuted, fontSize: 13, lineHeight: 20 },
     hint: { color: c.textFaint, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
+
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+    modalSheet: { backgroundColor: c.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
+    modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: c.borderFaint },
+    modalTitle: { color: c.text, fontSize: 18, fontFamily: 'Fraunces' },
+    modalLoading: { paddingVertical: 40 },
+    modalScroll: { padding: 16, paddingBottom: 32, gap: 18 },
+    ctxVerse: { gap: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.borderFaint },
+    ctxVerseFocal: { backgroundColor: c.surface, borderRadius: 12, padding: 12, borderBottomWidth: 0, borderLeftWidth: 3, borderLeftColor: c.accent },
+    ctxAyahNum: { color: c.accent, fontSize: 12, fontWeight: '600' },
   })
 }

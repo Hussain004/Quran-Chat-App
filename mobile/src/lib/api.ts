@@ -41,6 +41,21 @@ export async function sendMessage(
   return res.json()
 }
 
+export type ContextVerse = {
+  surahNumber: number
+  ayahNumber: number
+  surahNameEn: string
+  arabicText: string
+  translation: string
+}
+
+export async function fetchVerseContext(surah: number, ayah: number, radius = 3): Promise<ContextVerse[]> {
+  const res = await fetch(`${API_BASE}/api/verses?surah=${surah}&ayah=${ayah}&radius=${radius}`)
+  if (!res.ok) throw new Error(`Context request failed: ${res.status}`)
+  const data = await res.json()
+  return data.verses ?? []
+}
+
 export async function generateTitle(firstMessage: string): Promise<string> {
   try {
     const res = await fetch(`${API_BASE}/api/title`, {
