@@ -433,6 +433,6 @@ function makeStyles(c: Colors) {
     followUpScroll: { flexGrow: 0 },
     followUpRow: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8 },
     followChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 16, paddingLeft: 12, paddingRight: 14, paddingVertical: 8, marginRight: 8, maxWidth: 260 },
-    followChipText: { color: c.textSecondary, fontSize: 13, flex: 1 },
+    followChipText: { color: c.textSecondary, fontSize: 13, flexShrink: 1 },
   })
 }
