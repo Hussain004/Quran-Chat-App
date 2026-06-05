@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { fetchDailyVerse, type ContextVerse } from '@/lib/api'
 import { useState, useCallback, useMemo } from 'react'
 import { ConversationSkeleton } from '@/components/Skeleton'
 import { Ionicons } from '@expo/vector-icons'
@@ -26,8 +27,10 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState<string | null>(null)
   const [recentsLoading, setRecentsLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [dailyVerse, setDailyVerse] = useState<ContextVerse | null>(null)
 
   const loadData = useCallback(async () => {
+    fetchDailyVerse().then(setDailyVerse)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
@@ -79,6 +82,23 @@ export default function HomeScreen() {
         </Text>
         <Text style={styles.subtitle}>What would you like to know?</Text>
       </View>
+
+      {dailyVerse && (
+        <TouchableOpacity
+          style={styles.dailyCard}
+          activeOpacity={0.85}
+          onPress={() => startNewConversation(`Explain ${dailyVerse.surahNameEn} ${dailyVerse.surahNumber}:${dailyVerse.ayahNumber}`)}
+          disabled={creating}
+        >
+          <View style={styles.dailyHeader}>
+            <Ionicons name="sunny-outline" size={14} color={colors.accent} />
+            <Text style={styles.dailyLabel}>VERSE OF THE DAY</Text>
+          </View>
+          <Text style={styles.dailyArabic} numberOfLines={2}>{dailyVerse.arabicText}</Text>
+          <Text style={styles.dailyTranslation} numberOfLines={3}>{dailyVerse.translation}</Text>
+          <Text style={styles.dailyRef}>{dailyVerse.surahNameEn} {dailyVerse.surahNumber}:{dailyVerse.ayahNumber}</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity
         style={[styles.newChatBtn, creating && styles.newChatBtnDisabled]}
@@ -173,6 +193,13 @@ function makeStyles(c: Colors) {
     },
     newChatBtnDisabled: { opacity: 0.65 },
     newChatText: { flex: 1, color: '#F8F4ED', fontSize: 16, fontWeight: '600' },
+
+    dailyCard: { backgroundColor: c.surface, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: c.accentBorder, marginBottom: 24, gap: 8 },
+    dailyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    dailyLabel: { color: c.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
+    dailyArabic: { color: c.text, fontSize: 22, lineHeight: 42, textAlign: 'right', fontFamily: 'NoorHira', writingDirection: 'rtl' },
+    dailyTranslation: { color: c.textSecondary, fontSize: 14, lineHeight: 21 },
+    dailyRef: { color: c.accent, fontSize: 13, fontFamily: 'Fraunces' },
 
     sectionLabel: {
       color: c.textMuted, fontSize: 12, fontWeight: '600',

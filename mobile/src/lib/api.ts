@@ -56,6 +56,17 @@ export async function fetchVerseContext(surah: number, ayah: number, radius = 3)
   return data.verses ?? []
 }
 
+export async function fetchDailyVerse(): Promise<ContextVerse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/daily-verse`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.verse ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function generateTitle(firstMessage: string): Promise<string> {
   try {
     const res = await fetch(`${API_BASE}/api/title`, {
