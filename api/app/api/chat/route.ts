@@ -141,6 +141,54 @@ async function embedQuery(text: string): Promise<number[]> {
   return data.data[0].embedding
 }
 
+// A few well-known verses people ask for by name.
+const NAMED_VERSES: Record<string, [number, number]> = {
+  'ayat al-kursi': [2, 255],
+  'ayatul kursi': [2, 255],
+  'ayat ul kursi': [2, 255],
+  'ayatul-kursi': [2, 255],
+  'throne verse': [2, 255],
+  'verse of light': [24, 35],
+  'ayat an-nur': [24, 35],
+}
+
+// Detect an explicit verse reference in the question: "2:255", "surah 2 verse 255",
+// or a named verse. Returns null when none is present.
+function parseVerseRef(message: string): { surah: number; ayah: number } | null {
+  const lower = message.toLowerCase()
+  for (const name in NAMED_VERSES) {
+    if (lower.includes(name)) {
+      const [surah, ayah] = NAMED_VERSES[name]
+      return { surah, ayah }
+    }
+  }
+  let m = message.match(/\b(\d{1,3})\s*[:.]\s*(\d{1,3})\b/)
+  if (m) return { surah: +m[1], ayah: +m[2] }
+  m = lower.match(/surah\s+(\d{1,3})\D+(?:verse|ayah|ayat)\s+(\d{1,3})/)
+  if (m) return { surah: +m[1], ayah: +m[2] }
+  return null
+}
+
+// Fetch a single verse (plus its tafseer) directly by reference, shaped like a
+// match_verses row with similarity 1 so it is treated as a confident match.
+async function fetchVerseByRef(surah: number, ayah: number) {
+  if (surah < 1 || surah > 114 || ayah < 1) return null
+  const { data: vs } = await supabase
+    .from('verses')
+    .select('surah_number, ayah_number, surah_name_en, arabic_text, translation')
+    .eq('surah_number', surah)
+    .eq('ayah_number', ayah)
+    .limit(1)
+  if (!vs || vs.length === 0) return null
+  const { data: tf } = await supabase
+    .from('tafseer')
+    .select('text')
+    .eq('surah_number', surah)
+    .eq('ayah_number', ayah)
+    .limit(1)
+  return { ...vs[0], similarity: 1, tafseer_text: tf?.[0]?.text ?? null }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { message, history = [], language = 'en' } = await req.json()
@@ -156,12 +204,26 @@ export async function POST(req: NextRequest) {
     const queryEmbedding = await embedQuery(searchQuery)
 
     // 3. Retrieve the most semantically relevant verses via pgvector
-    const { data: verses, error: rpcError } = await supabase.rpc('match_verses', {
+    const { data: rpcVerses, error: rpcError } = await supabase.rpc('match_verses', {
       query_embedding: queryEmbedding,
       match_threshold: 0.60,
       match_count: 8,
     })
     if (rpcError) throw new Error(rpcError.message)
+
+    // 3a. If the user named a specific ayah (e.g. "2:255" or "Ayat al-Kursi"),
+    //     fetch it directly and put it first so an exact reference is never
+    //     missed by semantic search.
+    const ref = parseVerseRef(message)
+    const exactVerse = ref ? await fetchVerseByRef(ref.surah, ref.ayah) : null
+    const verses = exactVerse
+      ? [
+          exactVerse,
+          ...(rpcVerses ?? []).filter(
+            (v: any) => !(v.surah_number === exactVerse.surah_number && v.ayah_number === exactVerse.ayah_number),
+          ),
+        ].slice(0, 8)
+      : rpcVerses ?? []
 
     const hasRelevantVerses = verses && verses.length > 0
     const maxSimilarity = hasRelevantVerses
