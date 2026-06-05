@@ -6,6 +6,7 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
   <img src="docs/screenshots/initial.png" width="320" />
 </p>
 
+<div align="center">
 <table>
   <tr>
     <td align="center"><b>Welcome (Dark)</b></td>
@@ -16,8 +17,10 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
     <td><img src="docs/screenshots/welcome_light.png" width="320"/></td>
   </tr>
 </table>
+</div>
 
 
+<div align="center">
 <table>
   <tr>
     <td align="center"><b>Home (Dark)</b></td>
@@ -28,7 +31,9 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
     <td><img src="docs/screenshots/home_light.png" width="320"/></td>
   </tr>
 </table>
+</div>
 
+<div align="center">
 <table>
   <tr>
     <td align="center"><b>Chat (Dark)</b></td>
@@ -39,8 +44,10 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
     <td><img src="docs/screenshots/chat_light.png" width="320"/></td>
   </tr>
 </table>
+</div>
 -->
 
+<div align="center">
 <table>
   <tr>
     <td align="center"><b>Prayer (Dark)</b></td>
@@ -51,6 +58,7 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
     <td><img src="docs/screenshots/prayer_light.png" width="320"/></td>
   </tr>
 </table>
+</div>
 
 
 ## Features
