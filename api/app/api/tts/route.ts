@@ -15,12 +15,13 @@ const GEC_VERSION = '1-143.0.3650.75'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0'
 
-// A natural male neural voice per supported language. Andrew is the warmest,
-// most natural-sounding English Edge voice (swap for en-US-BrianNeural or
-// en-US-ChristopherNeural for a different tone). Asad and Hamed are the
-// standard male voices for Urdu and Arabic.
+// A lively male neural voice per supported language. Brian (multilingual) is the
+// most expressive, animated English Edge voice, noticeably warmer and less flat
+// than Andrew (swap for en-US-AndrewMultilingualNeural for a calmer tone, or
+// en-US-GuyNeural for a news read). Asad and Hamed are the standard male voices
+// for Urdu and Arabic.
 const VOICES: Record<string, { voice: string; lang: string }> = {
-  en: { voice: 'en-US-AndrewNeural', lang: 'en-US' },
+  en: { voice: 'en-US-BrianMultilingualNeural', lang: 'en-US' },
   ur: { voice: 'ur-PK-AsadNeural', lang: 'ur-PK' },
   ar: { voice: 'ar-SA-HamedNeural', lang: 'ar-SA' },
 }
@@ -78,7 +79,7 @@ function synthesize(text: string, voice: string, lang: string): Promise<Buffer> 
       )
       const ssml =
         `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>` +
-        `<voice name='${voice}'><prosody pitch='+0Hz' rate='-4%' volume='+0%'>${escapeSsml(text)}</prosody></voice></speak>`
+        `<voice name='${voice}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${escapeSsml(text)}</prosody></voice></speak>`
       ws.send(
         `X-RequestId:${randomUUID().replace(/-/g, '')}\r\n` +
         `Content-Type:application/ssml+xml\r\n` +

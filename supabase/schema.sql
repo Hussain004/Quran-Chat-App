@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 -- -------------------------------------------------------
 -- Messages (user turns + AI turns)
 -- cited_verses: [{surah_number, ayah_number, surah_name_en, arabic_text, translation}]
+-- follow_ups:   ["question 1", "question 2", ...] suggested next questions
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS messages (
   id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -75,8 +76,12 @@ CREATE TABLE IF NOT EXISTS messages (
   role            TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
   content         TEXT NOT NULL,
   cited_verses    JSONB,
+  follow_ups      JSONB,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add follow_ups to databases created before this column existed (no-op otherwise)
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS follow_ups JSONB;
 
 -- -------------------------------------------------------
 -- Tafseer (Ibn Kathir, English) — one row per ayah

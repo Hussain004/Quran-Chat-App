@@ -87,6 +87,7 @@ export default function ChatScreen() {
         content: m.content,
         citedVerses: m.cited_verses ?? [],
         lowConfidence: false,
+        followUps: m.follow_ups ?? undefined,
       })))
       isFirstMessage.current = false
       const assistantIds = data.filter(m => m.role === 'assistant').map(m => m.id)
@@ -119,6 +120,12 @@ export default function ChatScreen() {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
   }, [])
 
+  // Scroll to the newest message only when the message count changes (a new
+  // turn), not when an existing bubble grows, e.g. expanding a tafseer dropdown.
+  useEffect(() => {
+    if (messages.length > 0) scrollToBottom()
+  }, [messages.length, scrollToBottom])
+
   async function handleSend(textOverride?: string) {
     const text = (textOverride ?? input).trim()
     if (!text || loading) return
@@ -133,7 +140,6 @@ export default function ChatScreen() {
     }
     setMessages(prev => [...prev, userMsg])
     setLoading(true)
-    scrollToBottom()
 
     const history = messages.filter(m => !m.failed).map(m => ({ role: m.role, content: m.content }))
 
@@ -151,7 +157,6 @@ export default function ChatScreen() {
         followUps,
       }
       setMessages(prev => [...prev, aiMsg])
-      scrollToBottom()
 
       const { data: savedUser } = await supabase.from('messages').insert({
         conversation_id: id,
@@ -172,6 +177,14 @@ export default function ChatScreen() {
           if (m.id === aiMsg.id) return { ...m, id: savedAi.id }
           return m
         }))
+      }
+
+      // Persist follow-ups so they survive reopening the chat. Best-effort: if
+      // the follow_ups column has not been added yet, this no-ops harmlessly.
+      if (savedAi && followUps && followUps.length > 0) {
+        try {
+          await supabase.from('messages').update({ follow_ups: followUps }).eq('id', savedAi.id)
+        } catch { /* column may not exist yet; non-critical */ }
       }
 
       await supabase.from('conversations')
@@ -258,12 +271,12 @@ export default function ChatScreen() {
         <View style={{ width: 36 }} />
       </View>
 
+      <View style={styles.listWrap}>
       <FlashList
         ref={listRef}
         data={[...messages, ...(loading ? [{ id: '__typing__', role: 'typing' as const, content: '' }] : [])] as ListItem[]}
         keyExtractor={(item: ListItem) => item.id}
         contentContainerStyle={styles.listContent}
-        onContentSizeChange={scrollToBottom}
         onScrollBeginDrag={Keyboard.dismiss}
         ListEmptyComponent={
           !loading ? (
@@ -290,12 +303,14 @@ export default function ChatScreen() {
           )
         }}
       />
+      </View>
 
       {suggestions && suggestions.length > 0 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          style={styles.followUpScroll}
           contentContainerStyle={styles.followUpRow}
         >
           {suggestions.map((q, i) => (
@@ -358,6 +373,7 @@ export default function ChatScreen() {
 function makeStyles(c: Colors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
+    listWrap: { flex: 1 },
 
     header: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -387,7 +403,8 @@ function makeStyles(c: Colors) {
     micBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
     micBtnActive: { backgroundColor: c.errorBg },
 
-    followUpRow: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 2, alignItems: 'center' },
+    followUpScroll: { flexGrow: 0 },
+    followUpRow: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8 },
     followChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, maxWidth: 260 },
     followChipText: { color: c.textSecondary, fontSize: 13 },
   })

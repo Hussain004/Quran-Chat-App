@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { fetchDailyVerse, type ContextVerse } from '@/lib/api'
 import { useState, useCallback, useMemo } from 'react'
 import { ConversationSkeleton } from '@/components/Skeleton'
+import { VerseViewerModal } from '@/components/VerseViewerModal'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { useTheme } from '@/context/ThemeContext'
@@ -28,6 +29,7 @@ export default function HomeScreen() {
   const [recentsLoading, setRecentsLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [dailyVerse, setDailyVerse] = useState<ContextVerse | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
 
   const loadData = useCallback(async () => {
     fetchDailyVerse().then(setDailyVerse)
@@ -72,6 +74,7 @@ export default function HomeScreen() {
   const firstName = displayName.split(' ')[0]
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: top + 20 }]} showsVerticalScrollIndicator={false}>
       <StatusBar style={colors.statusBar} />
 
@@ -87,8 +90,7 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.dailyCard}
           activeOpacity={0.85}
-          onPress={() => startNewConversation(`Explain ${dailyVerse.surahNameEn} ${dailyVerse.surahNumber}:${dailyVerse.ayahNumber}`)}
-          disabled={creating}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewerOpen(true) }}
         >
           <View style={styles.dailyHeader}>
             <Ionicons name="sunny-outline" size={14} color={colors.accent} />
@@ -96,7 +98,13 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.dailyArabic} numberOfLines={2}>{dailyVerse.arabicText}</Text>
           <Text style={styles.dailyTranslation} numberOfLines={3}>{dailyVerse.translation}</Text>
-          <Text style={styles.dailyRef}>{dailyVerse.surahNameEn} {dailyVerse.surahNumber}:{dailyVerse.ayahNumber}</Text>
+          <View style={styles.dailyFooter}>
+            <Text style={styles.dailyRef}>{dailyVerse.surahNameEn} {dailyVerse.surahNumber}:{dailyVerse.ayahNumber}</Text>
+            <View style={styles.dailyListen}>
+              <Ionicons name="play-circle-outline" size={15} color={colors.accent} />
+              <Text style={styles.dailyListenText}>Listen & read</Text>
+            </View>
+          </View>
         </TouchableOpacity>
       )}
 
@@ -160,6 +168,15 @@ export default function HomeScreen() {
         )}
       </View>
     </ScrollView>
+
+    <VerseViewerModal
+      visible={viewerOpen}
+      surah={dailyVerse?.surahNumber ?? null}
+      ayah={dailyVerse?.ayahNumber ?? null}
+      surahNameEn={dailyVerse?.surahNameEn}
+      onClose={() => setViewerOpen(false)}
+    />
+    </>
   )
 }
 
@@ -199,7 +216,10 @@ function makeStyles(c: Colors) {
     dailyLabel: { color: c.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
     dailyArabic: { color: c.text, fontSize: 22, lineHeight: 42, textAlign: 'right', fontFamily: 'NoorHira', writingDirection: 'rtl' },
     dailyTranslation: { color: c.textSecondary, fontSize: 14, lineHeight: 21 },
+    dailyFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
     dailyRef: { color: c.accent, fontSize: 13, fontFamily: 'Fraunces' },
+    dailyListen: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    dailyListenText: { color: c.accent, fontSize: 12, fontWeight: '600' },
 
     sectionLabel: {
       color: c.textMuted, fontSize: 12, fontWeight: '600',

@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Alert, Switch, ScrollView } from 'react-native'
 import { Text } from '@/lib/typography'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -53,7 +53,11 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: top + 16 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: top + 16 }]}
+      showsVerticalScrollIndicator={false}
+    >
       <StatusBar style={colors.statusBar} />
       <Text style={styles.header}>Settings</Text>
 
@@ -126,13 +130,14 @@ export default function SettingsScreen() {
       <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   )
 }
 
 function makeStyles(c: Colors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: c.bg, padding: 24 },
+    container: { flex: 1, backgroundColor: c.bg },
+    content: { padding: 24, paddingBottom: 40 },
     header: { color: c.text, fontSize: 28, fontFamily: 'Fraunces', marginBottom: 32 },
     section: { marginBottom: 24, gap: 8 },
     sectionLabel: { color: c.text, opacity: 0.5, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
@@ -149,7 +154,7 @@ function makeStyles(c: Colors) {
     langLabel: { flex: 1, color: c.text, fontSize: 15 },
     langCheck: { color: c.accent, fontSize: 16, fontWeight: '700' },
 
-    signOutBtn: { marginTop: 'auto', backgroundColor: c.signOutBg, borderRadius: 12, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: c.signOutBorder },
+    signOutBtn: { marginTop: 8, backgroundColor: c.signOutBg, borderRadius: 12, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: c.signOutBorder },
     signOutText: { color: c.signOutText, fontSize: 16, fontWeight: '600' },
   })
 }

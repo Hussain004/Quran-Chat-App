@@ -1,13 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { View, TouchableOpacity, StyleSheet, Modal, ScrollView, ActivityIndicator } from 'react-native'
+import { View, TouchableOpacity, StyleSheet } from 'react-native'
 import { captureRef } from 'react-native-view-shot'
 import * as Sharing from 'expo-sharing'
 import { Text } from '@/lib/typography'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { playAyah, stopAyah } from '@/lib/recitation'
+import { VerseViewerModal } from './VerseViewerModal'
 import { useTheme } from '@/context/ThemeContext'
-import { fetchVerseContext, type CitedVerse, type ContextVerse } from '@/lib/api'
+import { type CitedVerse } from '@/lib/api'
 import type { Colors } from '@/lib/theme'
 
 type Props = {
@@ -86,7 +87,6 @@ export function VerseCard({ verses }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [playingKey, setPlayingKey] = useState<string | null>(null)
   const [contextTarget, setContextTarget] = useState<CitedVerse | null>(null)
-  const [contextVerses, setContextVerses] = useState<ContextVerse[] | null>(null)
   const [shareVerseData, setShareVerseData] = useState<CitedVerse | null>(null)
   const shotRef = useRef<View>(null)
 
@@ -149,16 +149,13 @@ export function VerseCard({ verses }: Props) {
 
   function openContext(verse: CitedVerse) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    stopAyah()
+    setPlayingKey(null)
     setContextTarget(verse)
-    setContextVerses(null)
-    fetchVerseContext(verse.surahNumber, verse.ayahNumber, 3)
-      .then(setContextVerses)
-      .catch(() => setContextVerses([]))
   }
 
   function closeContext() {
     setContextTarget(null)
-    setContextVerses(null)
   }
 
   return (
@@ -189,36 +186,13 @@ export function VerseCard({ verses }: Props) {
         </View>
       )}
 
-      <Modal visible={!!contextTarget} transparent animationType="slide" onRequestClose={closeContext}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {contextTarget ? `${contextTarget.surahNameEn} ${contextTarget.surahNumber}` : ''}
-              </Text>
-              <TouchableOpacity onPress={closeContext} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="close" size={24} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            {contextVerses === null ? (
-              <ActivityIndicator color={colors.accent} style={styles.modalLoading} />
-            ) : (
-              <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
-                {contextVerses.map(v => {
-                  const focal = !!contextTarget && v.ayahNumber === contextTarget.ayahNumber
-                  return (
-                    <View key={v.ayahNumber} style={[styles.ctxVerse, focal && styles.ctxVerseFocal]}>
-                      <Text style={styles.ctxAyahNum}>{v.surahNumber}:{v.ayahNumber}</Text>
-                      <Text style={styles.arabic}>{v.arabicText}</Text>
-                      <Text style={styles.translation}>{v.translation}</Text>
-                    </View>
-                  )
-                })}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+      <VerseViewerModal
+        visible={!!contextTarget}
+        surah={contextTarget?.surahNumber ?? null}
+        ayah={contextTarget?.ayahNumber ?? null}
+        surahNameEn={contextTarget?.surahNameEn}
+        onClose={closeContext}
+      />
 
       {shareVerseData && (
         <View style={styles.shotWrap} pointerEvents="none">
@@ -257,16 +231,6 @@ function makeStyles(c: Colors) {
     tafseerToggleText: { color: c.accent, fontSize: 12, fontWeight: '500', opacity: 0.85 },
     tafseerText: { color: c.textMuted, fontSize: 13, lineHeight: 20 },
     hint: { color: c.textFaint, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
-
-    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-    modalSheet: { backgroundColor: c.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
-    modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: c.borderFaint },
-    modalTitle: { color: c.text, fontSize: 18, fontFamily: 'Fraunces' },
-    modalLoading: { paddingVertical: 40 },
-    modalScroll: { padding: 16, paddingBottom: 32, gap: 18 },
-    ctxVerse: { gap: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.borderFaint },
-    ctxVerseFocal: { backgroundColor: c.surface, borderRadius: 12, padding: 12, borderBottomWidth: 0, borderLeftWidth: 3, borderLeftColor: c.accent },
-    ctxAyahNum: { color: c.accent, fontSize: 12, fontWeight: '600' },
 
     // Off-screen branded card captured for image sharing (fixed palette so the
     // shared image always looks the same regardless of the in-app theme).
