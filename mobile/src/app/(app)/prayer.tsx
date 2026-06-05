@@ -43,6 +43,7 @@ export default function PrayerScreen() {
   const [cityName, setCityName] = useState<string | null>(null)
   const [prayers, setPrayers] = useState<Prayer[] | null>(null)
   const [nextKey, setNextKey] = useState<string | null>(null)
+  const [nextPrayer, setNextPrayer] = useState<Prayer | null>(null)
   const [nextCountdown, setNextCountdown] = useState('')
   const [qiblaBearing, setQiblaBearing] = useState<number | null>(null)
   const [heading, setHeading] = useState(0)
@@ -77,8 +78,16 @@ export default function PrayerScreen() {
       setQiblaBearing(Qibla(coords))
 
       const now = new Date()
-      const next = list.find(p => p.time > now) ?? list[0]
+      let next = list.find(p => p.time > now)
+      if (!next) {
+        // All today's prayers have passed -- use tomorrow's Fajr
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const tomorrowTimes = new PrayerTimes(coords, tomorrow, params)
+        next = { key: 'fajr', label: 'Fajr', arabic: 'الفجر', time: tomorrowTimes.fajr }
+      }
       setNextKey(next.key)
+      setNextPrayer(next)
 
       try {
         const geo = await Location.reverseGeocodeAsync({ latitude, longitude })
@@ -95,15 +104,12 @@ export default function PrayerScreen() {
 
   // Refresh countdown every minute
   useEffect(() => {
-    if (!prayers || !nextKey) return
-    const update = () => {
-      const p = prayers.find(x => x.key === nextKey)
-      if (p) setNextCountdown(timeUntil(p.time))
-    }
+    if (!nextPrayer) return
+    const update = () => setNextCountdown(timeUntil(nextPrayer.time))
     update()
     const id = setInterval(update, 60000)
     return () => clearInterval(id)
-  }, [prayers, nextKey])
+  }, [nextPrayer])
 
   // Magnetometer for Qibla compass heading
   useEffect(() => {
@@ -164,16 +170,14 @@ export default function PrayerScreen() {
           </View>
         ) : prayers ? (
           <>
-            {nextKey && nextCountdown ? (
+            {nextPrayer && nextCountdown ? (
               <View style={styles.nextBanner}>
                 <Text style={styles.nextLabel}>Next prayer</Text>
-                <Text style={styles.nextName}>
-                  {prayers.find(p => p.key === nextKey)?.label}
+                <Text style={styles.nextName}>{nextPrayer.label}</Text>
+                <Text style={styles.nextTime}>{formatTime(nextPrayer.time)}</Text>
+                <Text style={styles.nextCountdown}>
+                  {nextCountdown === 'Now' ? 'Now' : `in ${nextCountdown}`}
                 </Text>
-                <Text style={styles.nextTime}>
-                  {formatTime(prayers.find(p => p.key === nextKey)!.time)}
-                </Text>
-                <Text style={styles.nextCountdown}>in {nextCountdown}</Text>
               </View>
             ) : null}
 
