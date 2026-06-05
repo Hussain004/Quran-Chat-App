@@ -1,3 +1,4 @@
+import { fetch as streamFetch } from 'expo/fetch'
 import type { AppLanguage } from '@/context/LanguageContext'
 
 export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://quran-chat-app-psi.vercel.app'
@@ -22,6 +23,73 @@ export type ChatResponse = {
   citedVerses: CitedVerse[]
   lowConfidence: boolean
   followUps?: string[]
+}
+
+const STREAM_SENTINEL = '<<<META>>>'
+
+// Streams the chat reply, calling onChunk with each new text fragment.
+// Returns the complete ChatResponse once the sentinel arrives.
+// Throws on network errors or if the server signals an error in the meta;
+// the caller should catch and fall back to sendMessage.
+export async function sendMessageStreaming(
+  message: string,
+  history: Message[],
+  language: AppLanguage = 'en',
+  onChunk: (text: string) => void,
+): Promise<ChatResponse> {
+  const res = await streamFetch(`${API_BASE}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history, language }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as any).error ?? `Request failed: ${res.status}`)
+  }
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let fullBuffer = ''
+  let sentUpTo = 0
+  const guardLen = STREAM_SENTINEL.length - 1
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    fullBuffer += decoder.decode(value as Uint8Array, { stream: true })
+
+    const metaIdx = fullBuffer.indexOf(STREAM_SENTINEL)
+    if (metaIdx !== -1) {
+      // Flush any remaining text before the sentinel
+      if (metaIdx > sentUpTo) onChunk(fullBuffer.slice(sentUpTo, metaIdx))
+      break
+    }
+
+    // Don't flush the last (guardLen) chars yet; they might be a split sentinel
+    const safeEnd = fullBuffer.length - guardLen
+    if (safeEnd > sentUpTo) {
+      onChunk(fullBuffer.slice(sentUpTo, safeEnd))
+      sentUpTo = safeEnd
+    }
+  }
+
+  const metaIdx = fullBuffer.indexOf(STREAM_SENTINEL)
+  if (metaIdx === -1) throw new Error('Stream ended without metadata')
+
+  let meta: any
+  try {
+    meta = JSON.parse(fullBuffer.slice(metaIdx + STREAM_SENTINEL.length))
+  } catch {
+    throw new Error('Failed to parse stream metadata')
+  }
+  if (meta.error) throw new Error(meta.error)
+
+  return {
+    reply: fullBuffer.slice(0, metaIdx).trimEnd(),
+    citedVerses: meta.citedVerses ?? [],
+    lowConfidence: meta.lowConfidence ?? false,
+    followUps: meta.followUps,
+  }
 }
 
 export async function sendMessage(

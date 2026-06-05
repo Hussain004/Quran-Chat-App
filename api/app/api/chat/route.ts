@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -29,12 +29,6 @@ const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
   ar: 'IMPORTANT: Write your entire response in Modern Standard Arabic (فصحى العربية). All text including citations must be in Arabic.',
 }
 
-// Turns a user's question (in any language, with honorifics / Arabic-Urdu name
-// spellings) into a clean ENGLISH query optimised for semantic search over the
-// English (Sahih International) verse translations. This is the single most
-// important step for retrieval quality: the English-only embedder does not know
-// that "Musa" means "Moses", so without it queries about Islamic figures match
-// the wrong verses entirely.
 const SEARCH_REWRITE_PROMPT = `You convert a user's question about the Qur'an into ONE concise English search query for a semantic search engine that indexes the English (Sahih International) translation of the Qur'an.
 
 Rules:
@@ -42,6 +36,8 @@ Rules:
 - Remove honorifics and titles entirely: Hazrat, Hadhrat, Sayyiduna, Prophet, Maulana, (PBUH), ﷺ, (AS), (RA).
 - Add a few key thematic words that are likely to appear in the verse translations (e.g. for Moses' miracles: signs, staff, hand, sea, Pharaoh).
 - Output ONLY the search query text. No quotes, no labels, no explanation. Maximum ~25 words.`
+
+const FOLLOWUP_PROMPT = `Based on the user's question and the assistant's answer about the Qur'an, propose exactly 3 follow-up questions the user is likely to ask next. Rules: each is a full natural question between 4 and 9 words; make them specific and varied (for example ask about a concrete example, a related virtue, or practical guidance); never use vague one or two word questions like "What is patience?". Output ONLY a JSON array of 3 strings, like ["...", "...", "..."]. No other text.`
 
 async function groqChat(messages: Array<{ role: string; content: string }>, maxTokens = 1100, temperature = 0.2): Promise<string> {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -65,10 +61,54 @@ async function groqChat(messages: Array<{ role: string; content: string }>, maxT
   return data.choices?.[0]?.message?.content ?? ''
 }
 
-// Build the English search query. Includes the last couple of turns so that
-// follow-up questions ("what about his brother?") resolve correctly. Falls back
-// to the raw message if the rewrite call fails, retrieval still works, just
-// less precisely.
+// Yields text delta strings from Groq's SSE stream.
+async function* groqChatStream(
+  messages: Array<{ role: string; content: string }>,
+  maxTokens = 1100,
+  temperature = 0.2,
+): AsyncGenerator<string> {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      stream: true,
+    }),
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(`Groq error: ${JSON.stringify(err.error?.message ?? err)}`)
+  }
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6).trim()
+      if (data === '[DONE]') return
+      try {
+        const parsed = JSON.parse(data)
+        const text = parsed.choices?.[0]?.delta?.content ?? ''
+        if (text) yield text
+      } catch { /* malformed SSE line, skip */ }
+    }
+  }
+}
+
 async function buildSearchQuery(
   message: string,
   history: Array<{ role: string; content: string }>,
@@ -88,10 +128,6 @@ async function buildSearchQuery(
     return message
   }
 }
-
-// After a grounded answer, suggest a few natural next questions. Kept short and
-// in the user's language. Best-effort: any failure just yields no suggestions.
-const FOLLOWUP_PROMPT = `Based on the user's question and the assistant's answer about the Qur'an, propose exactly 3 follow-up questions the user is likely to ask next. Rules: each is a full natural question between 4 and 9 words; make them specific and varied (for example ask about a concrete example, a related virtue, or practical guidance); never use vague one or two word questions like "What is patience?". Output ONLY a JSON array of 3 strings, like ["...", "...", "..."]. No other text.`
 
 async function generateFollowUps(message: string, reply: string, language: string): Promise<string[]> {
   try {
@@ -141,7 +177,6 @@ async function embedQuery(text: string): Promise<number[]> {
   return data.data[0].embedding
 }
 
-// A few well-known verses people ask for by name.
 const NAMED_VERSES: Record<string, [number, number]> = {
   'ayat al-kursi': [2, 255],
   'ayatul kursi': [2, 255],
@@ -152,8 +187,6 @@ const NAMED_VERSES: Record<string, [number, number]> = {
   'ayat an-nur': [24, 35],
 }
 
-// Detect an explicit verse reference in the question: "2:255", "surah 2 verse 255",
-// or a named verse. Returns null when none is present.
 function parseVerseRef(message: string): { surah: number; ayah: number } | null {
   const lower = message.toLowerCase()
   for (const name in NAMED_VERSES) {
@@ -169,8 +202,6 @@ function parseVerseRef(message: string): { surah: number; ayah: number } | null 
   return null
 }
 
-// Fetch a single verse (plus its tafseer) directly by reference, shaped like a
-// match_verses row with similarity 1 so it is treated as a confident match.
 async function fetchVerseByRef(surah: number, ayah: number) {
   if (surah < 1 || surah > 114 || ayah < 1) return null
   const { data: vs } = await supabase
@@ -190,20 +221,26 @@ async function fetchVerseByRef(surah: number, ayah: number) {
 }
 
 export async function POST(req: NextRequest) {
+  // --- Pre-streaming: parse request, retrieve verses ---
+  let message: string
+  let language: string
+  let groqMessages: Array<{ role: string; content: string }>
+  let citedVersesMapped: Array<Record<string, unknown>>
+  let lowConfidence: boolean
+
   try {
-    const { message, history = [], language = 'en' } = await req.json()
+    const body = await req.json()
+    message = body.message
+    language = body.language ?? 'en'
+    const history: Array<{ role: string; content: string }> = body.history ?? []
+
     if (!message?.trim()) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
     }
 
-    // 1. Rewrite the question into a clean English search query (normalises
-    //    names like Musa→Moses, strips honorifics, adds thematic terms).
     const searchQuery = await buildSearchQuery(message, history)
-
-    // 2. Embed the search query
     const queryEmbedding = await embedQuery(searchQuery)
 
-    // 3. Retrieve the most semantically relevant verses via pgvector
     const { data: rpcVerses, error: rpcError } = await supabase.rpc('match_verses', {
       query_embedding: queryEmbedding,
       match_threshold: 0.60,
@@ -211,12 +248,9 @@ export async function POST(req: NextRequest) {
     })
     if (rpcError) throw new Error(rpcError.message)
 
-    // 3a. If the user named a specific ayah (e.g. "2:255" or "Ayat al-Kursi"),
-    //     fetch it directly and put it first so an exact reference is never
-    //     missed by semantic search.
     const ref = parseVerseRef(message)
     const exactVerse = ref ? await fetchVerseByRef(ref.surah, ref.ayah) : null
-    const verses = exactVerse
+    const verses: any[] = exactVerse
       ? [
           exactVerse,
           ...(rpcVerses ?? []).filter(
@@ -225,15 +259,11 @@ export async function POST(req: NextRequest) {
         ].slice(0, 8)
       : rpcVerses ?? []
 
-    const hasRelevantVerses = verses && verses.length > 0
-    const maxSimilarity = hasRelevantVerses
-      ? Math.max(...verses.map((v: any) => v.similarity))
-      : 0
-    const lowConfidence = maxSimilarity < 0.65
+    const hasRelevantVerses = verses.length > 0
+    const maxSimilarity = hasRelevantVerses ? Math.max(...verses.map((v: any) => v.similarity)) : 0
+    lowConfidence = maxSimilarity < 0.65
 
-    // 4. Build grounded context, include a generous Tafseer snippet so the
-    //    model has real commentary to explain (not just the translation).
-    const TAFSEER_SNIPPET = 1000  // chars of Ibn Kathir to inject per verse
+    const TAFSEER_SNIPPET = 1000
     const verseContext = hasRelevantVerses && !lowConfidence
       ? verses
           .map((v: any) => {
@@ -254,44 +284,75 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join('\n\n')
 
-    // 5. Build chat history and call Groq for the grounded answer
     const chatHistory = history.slice(-6).map((msg: any) => ({
       role: msg.role === 'assistant' ? 'assistant' : 'user',
       content: msg.content,
     }))
 
-    const reply = await groqChat([
+    groqMessages = [
       { role: 'system', content: systemPrompt },
       ...chatHistory,
       { role: 'user', content: message },
-    ])
+    ]
 
-    // If the model determined the verses don't address the question, suppress
-    // the cited verses too, otherwise the UI shows "8 verses cited" beneath an
-    // "I couldn't find anything" message, which is contradictory and confusing.
-    const refused = reply.trim().startsWith('I was unable to find verses')
-
-    // Suggest follow-up questions only when we actually answered.
-    const followUps = refused || lowConfidence ? [] : await generateFollowUps(message, reply, language)
-
-    return NextResponse.json({
-      reply,
-      citedVerses: !lowConfidence && hasRelevantVerses && !refused
-        ? verses.map((v: any) => ({
-            surahNumber: v.surah_number,
-            ayahNumber: v.ayah_number,
-            surahNameEn: v.surah_name_en,
-            arabicText: v.arabic_text,
-            translation: v.translation,
-            similarity: v.similarity,
-            tafseer: v.tafseer_text ?? null,
-          }))
-        : [],
-      lowConfidence: lowConfidence || refused,
-      followUps,
-    })
+    citedVersesMapped = hasRelevantVerses && !lowConfidence
+      ? verses.map((v: any) => ({
+          surahNumber: v.surah_number,
+          ayahNumber: v.ayah_number,
+          surahNameEn: v.surah_name_en,
+          arabicText: v.arabic_text,
+          translation: v.translation,
+          similarity: v.similarity,
+          tafseer: v.tafseer_text ?? null,
+        }))
+      : []
   } catch (err: any) {
-    console.error('[/api/chat]', err.message)
+    console.error('[/api/chat setup]', err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
+
+  // --- Streaming phase: LLM reply + follow-ups ---
+  const encoder = new TextEncoder()
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
+  const writer = writable.getWriter()
+
+  // Run stream in the background; response is returned immediately.
+  ;(async () => {
+    try {
+      let fullReply = ''
+      for await (const chunk of groqChatStream(groqMessages)) {
+        fullReply += chunk
+        await writer.write(encoder.encode(chunk))
+      }
+
+      const refused = fullReply.trim().startsWith('I was unable to find verses')
+      const followUps = refused || lowConfidence ? [] : await generateFollowUps(message, fullReply, language)
+
+      const meta = JSON.stringify({
+        citedVerses: refused ? [] : citedVersesMapped,
+        lowConfidence: lowConfidence || refused,
+        followUps,
+      })
+      await writer.write(encoder.encode(`\n<<<META>>>${meta}`))
+    } catch (err: any) {
+      console.error('[/api/chat stream]', err?.message)
+      const errMeta = JSON.stringify({
+        citedVerses: [],
+        lowConfidence: true,
+        followUps: [],
+        error: err?.message ?? 'stream failed',
+      })
+      await writer.write(encoder.encode(`\n<<<META>>>${errMeta}`))
+    } finally {
+      await writer.close()
+    }
+  })()
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }

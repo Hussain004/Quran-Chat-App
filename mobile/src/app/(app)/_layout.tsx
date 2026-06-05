@@ -62,6 +62,12 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="prayer"
+        options={{
+          tabBarIcon: ({ focused }) => <TabIcon icon="compass-outline" iconFocused="compass" label="Prayer" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon icon="settings-outline" iconFocused="settings" label="Settings" focused={focused} />,

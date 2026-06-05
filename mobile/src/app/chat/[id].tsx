@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
-  View, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet, Platform,
   KeyboardAvoidingView, Alert, Keyboard, ScrollView, ActivityIndicator
 } from 'react-native'
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync } from 'expo-audio'
@@ -13,7 +13,7 @@ import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '@/lib/supabase'
-import { sendMessage, generateTitle, transcribeAudio, type Message, type CitedVerse } from '@/lib/api'
+import { sendMessage, sendMessageStreaming, generateTitle, transcribeAudio, type Message, type CitedVerse } from '@/lib/api'
 import { addBookmark, removeBookmark, getBookmarkedMessageIds } from '@/lib/bookmarks'
 import { MessageBubble } from '@/components/MessageBubble'
 import { TypingIndicator } from '@/components/TypingIndicator'
@@ -30,7 +30,8 @@ type ChatMessage = Message & {
 }
 
 type TypingItem = { id: string; role: 'typing'; content: string }
-type ListItem = ChatMessage | TypingItem
+type StreamingItem = { id: string; role: 'streaming'; content: string }
+type ListItem = ChatMessage | TypingItem | StreamingItem
 
 const MAX_CHARS = 500
 
@@ -52,6 +53,7 @@ export default function ChatScreen() {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
 
   useEffect(() => {
     loadMessages()
@@ -140,13 +142,31 @@ export default function ChatScreen() {
     }
     setMessages(prev => [...prev, userMsg])
     setLoading(true)
+    setStreamingText('')
 
     const history = messages.filter(m => !m.failed).map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const { reply, citedVerses, lowConfidence, followUps } = await sendMessage(text, history, language)
+      let reply: string
+      let citedVerses: CitedVerse[]
+      let lowConfidence: boolean
+      let followUps: string[] | undefined
+
+      try {
+        const result = await sendMessageStreaming(text, history, language, (chunk) => {
+          setStreamingText(prev => prev + chunk)
+          listRef.current?.scrollToEnd({ animated: false })
+        })
+        ;({ reply, citedVerses, lowConfidence, followUps } = result)
+      } catch {
+        // Streaming failed; fall back to non-streaming and show typing indicator
+        setStreamingText('')
+        const result = await sendMessage(text, history, language)
+        ;({ reply, citedVerses, lowConfidence, followUps } = result)
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      setStreamingText('')
 
       const aiMsg: ChatMessage = {
         id: `temp-ai-${Date.now()}`,
@@ -201,6 +221,7 @@ export default function ChatScreen() {
       }
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      setStreamingText('')
       setMessages(prev => prev.map(m => m.id === userMsg.id ? { ...m, failed: true } : m))
     } finally {
       setLoading(false)
@@ -258,7 +279,7 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
       <StatusBar style={colors.statusBar} />
@@ -274,7 +295,11 @@ export default function ChatScreen() {
       <View style={styles.listWrap}>
       <FlashList
         ref={listRef}
-        data={[...messages, ...(loading ? [{ id: '__typing__', role: 'typing' as const, content: '' }] : [])] as ListItem[]}
+        data={[
+          ...messages,
+          ...(loading && streamingText ? [{ id: '__streaming__', role: 'streaming' as const, content: streamingText }] : []),
+          ...(loading && !streamingText ? [{ id: '__typing__', role: 'typing' as const, content: '' }] : []),
+        ] as ListItem[]}
         keyExtractor={(item: ListItem) => item.id}
         contentContainerStyle={styles.listContent}
         onScrollBeginDrag={Keyboard.dismiss}
@@ -288,6 +313,9 @@ export default function ChatScreen() {
         }
         renderItem={({ item }: { item: ListItem }) => {
           if (item.role === 'typing') return <TypingIndicator />
+          if (item.role === 'streaming') return (
+            <MessageBubble role="assistant" content={item.content} citedVerses={[]} />
+          )
           const msg = item as ChatMessage
           return (
             <MessageBubble
@@ -405,7 +433,7 @@ function makeStyles(c: Colors) {
 
     followUpScroll: { flexGrow: 0 },
     followUpRow: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8 },
-    followChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, maxWidth: 260 },
-    followChipText: { color: c.textSecondary, fontSize: 13 },
+    followChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 16, paddingLeft: 12, paddingRight: 14, paddingVertical: 8, marginRight: 8, maxWidth: 260 },
+    followChipText: { color: c.textSecondary, fontSize: 13, flex: 1 },
   })
 }
