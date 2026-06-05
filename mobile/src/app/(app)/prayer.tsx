@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import * as Location from 'expo-location'
 import { Magnetometer } from 'expo-sensors'
-import { Coordinates, CalculationMethod, PrayerTimes, Qibla } from 'adhan'
+import { Coordinates, CalculationMethod, PrayerTimes, Qibla, Madhab } from 'adhan'
 import { useTheme } from '@/context/ThemeContext'
 import type { Colors } from '@/lib/theme'
 
@@ -63,6 +63,7 @@ export default function PrayerScreen() {
 
       const coords = new Coordinates(latitude, longitude)
       const params = CalculationMethod.MuslimWorldLeague()
+      params.madhab = Madhab.Hanafi
       const times = new PrayerTimes(coords, new Date(), params)
 
       const list: Prayer[] = [
@@ -108,9 +109,9 @@ export default function PrayerScreen() {
   useEffect(() => {
     Magnetometer.setUpdateInterval(150)
     const sub = Magnetometer.addListener(({ x, y }) => {
-      // atan2(x, y) gives heading in degrees where 0 = top of screen pointing north.
-      // Works best when the device is held roughly level.
-      let angle = Math.atan2(x, y) * (180 / Math.PI)
+      // atan2(-x, y): when device top points North, B_x=0, B_y=+Bh → 0°.
+      // When top points East, B_x=-Bh, B_y=0 → atan2(Bh, 0) = 90°. Correct compass convention.
+      let angle = Math.atan2(-x, y) * (180 / Math.PI)
       if (angle < 0) angle += 360
       setHeading(angle)
     })
@@ -297,7 +298,7 @@ function makeStyles(c: Colors) {
     prayerNameNext: { color: c.accent },
     prayerArabic: {
       color: c.textFaint,
-      fontSize: 14,
+      fontSize: 19,
       fontFamily: 'NoorHira',
       marginTop: 2,
       writingDirection: 'rtl',
