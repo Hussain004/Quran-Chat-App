@@ -229,10 +229,12 @@ export async function POST(req: NextRequest) {
   let citedVersesMapped: Array<Record<string, unknown>>
   let lowConfidence: boolean
 
+  let wantStream: boolean
   try {
     const body = await req.json()
     message = body.message
     language = body.language ?? 'en'
+    wantStream = body.stream === true
     const history: Array<{ role: string; content: string }> = body.history ?? []
 
     if (!message?.trim()) {
@@ -312,7 +314,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 
-  // --- Streaming phase: LLM reply + follow-ups ---
+  // --- Non-streaming path (sendMessage fallback) ---
+  if (!wantStream) {
+    try {
+      const fullReply = await groqChat(groqMessages)
+      const refused = fullReply.trim().startsWith('I was unable to find verses')
+      const followUps = refused || lowConfidence ? [] : await generateFollowUps(message, fullReply, language)
+      return NextResponse.json({
+        reply: fullReply,
+        citedVerses: refused ? [] : citedVersesMapped,
+        lowConfidence: lowConfidence || refused,
+        followUps,
+      })
+    } catch (err: any) {
+      console.error('[/api/chat sync]', err?.message)
+      return NextResponse.json({ error: err?.message ?? 'generation failed' }, { status: 500 })
+    }
+  }
+
+  // --- Streaming phase (sendMessageStreaming, stream: true) ---
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({

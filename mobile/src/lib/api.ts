@@ -40,7 +40,7 @@ export async function sendMessageStreaming(
   const res = await streamFetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, history, language }),
+    body: JSON.stringify({ message, history, language, stream: true }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
