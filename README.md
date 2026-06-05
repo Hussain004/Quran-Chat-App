@@ -2,55 +2,37 @@
 
 An AI-powered conversational app grounded entirely in Qur'anic verses. Every answer is backed by real citations retrieved via semantic search, with no hallucinated content.
 
-<!-- ============================================================
-     SCREENSHOTS
-     Steps:
-       1. Take screenshots on your phone for both dark and light mode
-          (toggle in Settings > Appearance > Dark Mode)
-       2. Create the folder:  docs/screenshots/
-       3. Save each file with the name shown in the src= attributes below
-       4. Remove the <!-- and --> lines that wrap the <table> blocks
+<p align="center">
+  <img src="docs/screenshots/initial.png" width="320" />
+</p>
 
-     Screens to capture (toggle dark/light for each):
-       welcome     Welcome splash screen (before signing in)
-       home        Home screen showing Verse of the Day + topic chips
-       chat        Chat screen mid-conversation, verse citation card expanded
-       prayer      Prayer Times screen showing the 5 prayers + Qibla compass
-
-     Tip: long-press the power + volume-down buttons to screenshot on Android.
-     ============================================================ -->
-
-<!-- SCREENSHOT ROW: Welcome screen (dark left, light right)
 <table>
   <tr>
-    <td align="center"><b>Welcome — Dark</b></td>
-    <td align="center"><b>Welcome — Light</b></td>
+    <td align="center"><b>Welcome (Dark)</b></td>
+    <td align="center"><b>Welcome (Light)</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/welcome_dark.png" width="320"/></td>
     <td><img src="docs/screenshots/welcome_light.png" width="320"/></td>
   </tr>
 </table>
--->
 
-<!-- SCREENSHOT ROW: Home screen (dark left, light right)
+
 <table>
   <tr>
-    <td align="center"><b>Home — Dark</b></td>
-    <td align="center"><b>Home — Light</b></td>
+    <td align="center"><b>Home (Dark)</b></td>
+    <td align="center"><b>Home (Light)</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/home_dark.png" width="320"/></td>
     <td><img src="docs/screenshots/home_light.png" width="320"/></td>
   </tr>
 </table>
--->
 
-<!-- SCREENSHOT ROW: Chat screen — show a real question with a verse card expanded (dark left, light right)
 <table>
   <tr>
-    <td align="center"><b>Chat — Dark</b></td>
-    <td align="center"><b>Chat — Light</b></td>
+    <td align="center"><b>Chat (Dark)</b></td>
+    <td align="center"><b>Chat (Light)</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/chat_dark.png" width="320"/></td>
@@ -59,18 +41,17 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
 </table>
 -->
 
-<!-- SCREENSHOT ROW: Prayer Times + Qibla compass (dark left, light right)
 <table>
   <tr>
-    <td align="center"><b>Prayer — Dark</b></td>
-    <td align="center"><b>Prayer — Light</b></td>
+    <td align="center"><b>Prayer (Dark)</b></td>
+    <td align="center"><b>Prayer (Light)</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/prayer_dark.png" width="320"/></td>
     <td><img src="docs/screenshots/prayer_light.png" width="320"/></td>
   </tr>
 </table>
--->
+
 
 ## Features
 
