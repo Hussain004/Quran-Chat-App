@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   View, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Alert, Keyboard, ScrollView
+  KeyboardAvoidingView, Alert, Keyboard, ScrollView, ActivityIndicator
 } from 'react-native'
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync } from 'expo-audio'
 import type { TextInput as RNTextInput } from 'react-native'
 import { Text, TextInput } from '@/lib/typography'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -12,7 +13,7 @@ import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '@/lib/supabase'
-import { sendMessage, generateTitle, type Message, type CitedVerse } from '@/lib/api'
+import { sendMessage, generateTitle, transcribeAudio, type Message, type CitedVerse } from '@/lib/api'
 import { addBookmark, removeBookmark, getBookmarkedMessageIds } from '@/lib/bookmarks'
 import { MessageBubble } from '@/components/MessageBubble'
 import { TypingIndicator } from '@/components/TypingIndicator'
@@ -48,6 +49,9 @@ export default function ChatScreen() {
   const listRef = useRef<any>(null)
   const isFirstMessage = useRef(true)
   const inputRef = useRef<RNTextInput>(null)
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
 
   useEffect(() => {
     loadMessages()
@@ -195,6 +199,44 @@ export default function ChatScreen() {
     setTimeout(() => handleSend(failedMsg.content), 0)
   }
 
+  async function startRecording() {
+    try {
+      const perm = await requestRecordingPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Microphone off', 'Enable microphone access in your device settings to use voice input.')
+        return
+      }
+      await recorder.prepareToRecordAsync()
+      recorder.record()
+      setRecording(true)
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    } catch {
+      setRecording(false)
+    }
+  }
+
+  async function stopRecordingAndTranscribe() {
+    setRecording(false)
+    setTranscribing(true)
+    try {
+      await recorder.stop()
+      const uri = recorder.uri
+      if (!uri) return
+      const text = await transcribeAudio(uri, language)
+      if (text) setInput(prev => (prev ? `${prev} ${text}` : text).slice(0, MAX_CHARS))
+    } catch {
+      Alert.alert('Could not transcribe', 'Please try again.')
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
+  function handleMicPress() {
+    if (transcribing) return
+    if (recording) stopRecordingAndTranscribe()
+    else startRecording()
+  }
+
   const charsLeft = MAX_CHARS - input.length
   const showCounter = charsLeft <= 100
   const lastMsg = messages[messages.length - 1]
@@ -277,7 +319,7 @@ export default function ChatScreen() {
             style={styles.input}
             value={input}
             onChangeText={text => setInput(text.slice(0, MAX_CHARS))}
-            placeholder="Ask about the Qur'an…"
+            placeholder={recording ? 'Listening…' : transcribing ? 'Transcribing…' : "Ask about the Qur'an…"}
             placeholderTextColor={colors.placeholder}
             multiline
             maxLength={MAX_CHARS}
@@ -285,6 +327,17 @@ export default function ChatScreen() {
             onSubmitEditing={() => handleSend()}
             blurOnSubmit={false}
           />
+          <TouchableOpacity
+            style={[styles.micBtn, recording && styles.micBtnActive]}
+            onPress={handleMicPress}
+            disabled={transcribing}
+          >
+            {transcribing ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : (
+              <Ionicons name={recording ? 'stop' : 'mic-outline'} size={20} color={recording ? '#EF4444' : colors.textFaint} />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
             onPress={() => handleSend()}
@@ -331,6 +384,8 @@ function makeStyles(c: Colors) {
     },
     sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accent, justifyContent: 'center', alignItems: 'center' },
     sendBtnDisabled: { backgroundColor: c.border },
+    micBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+    micBtnActive: { backgroundColor: c.errorBg },
 
     followUpRow: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 2, alignItems: 'center' },
     followChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, maxWidth: 260 },

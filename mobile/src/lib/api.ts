@@ -67,6 +67,17 @@ export async function fetchDailyVerse(): Promise<ContextVerse | null> {
   }
 }
 
+export async function transcribeAudio(uri: string, language: AppLanguage = 'en'): Promise<string> {
+  const form = new FormData()
+  // React Native FormData accepts a file descriptor object for uploads.
+  form.append('file', { uri, name: 'speech.m4a', type: 'audio/m4a' } as unknown as Blob)
+  form.append('language', language)
+  const res = await fetch(`${API_BASE}/api/transcribe`, { method: 'POST', body: form })
+  if (!res.ok) throw new Error(`Transcription failed: ${res.status}`)
+  const data = await res.json()
+  return (data.text ?? '').trim()
+}
+
 export async function generateTitle(firstMessage: string): Promise<string> {
   try {
     const res = await fetch(`${API_BASE}/api/title`, {
