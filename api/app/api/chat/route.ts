@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'edge'
 export const maxDuration = 60
 
 const supabase = createClient(
@@ -39,7 +40,7 @@ Rules:
 
 const FOLLOWUP_PROMPT = `Based on the user's question and the assistant's answer about the Qur'an, propose exactly 3 follow-up questions the user is likely to ask next. Rules: each is a full natural question between 4 and 9 words; make them specific and varied (for example ask about a concrete example, a related virtue, or practical guidance); never use vague one or two word questions like "What is patience?". Output ONLY a JSON array of 3 strings, like ["...", "...", "..."]. No other text.`
 
-async function groqChat(messages: Array<{ role: string; content: string }>, maxTokens = 1100, temperature = 0.2): Promise<string> {
+async function groqChat(messages: Array<{ role: string; content: string }>, maxTokens = 1100, temperature = 0.2, model = 'llama-3.3-70b-versatile'): Promise<string> {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -47,7 +48,7 @@ async function groqChat(messages: Array<{ role: string; content: string }>, maxT
       'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model,
       messages,
       temperature,
       max_tokens: maxTokens,
@@ -121,7 +122,7 @@ async function buildSearchQuery(
     const rewritten = await groqChat([
       { role: 'system', content: SEARCH_REWRITE_PROMPT },
       { role: 'user', content: userContent },
-    ], 120, 0)
+    ], 120, 0, 'llama-3.1-8b-instant')
     const cleaned = rewritten.trim().replace(/^["']|["']$/g, '')
     return cleaned.length > 0 ? cleaned : message
   } catch {
@@ -313,42 +314,41 @@ export async function POST(req: NextRequest) {
 
   // --- Streaming phase: LLM reply + follow-ups ---
   const encoder = new TextEncoder()
-  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
-  const writer = writable.getWriter()
 
-  // Run stream in the background; response is returned immediately.
-  ;(async () => {
-    try {
-      let fullReply = ''
-      for await (const chunk of groqChatStream(groqMessages)) {
-        fullReply += chunk
-        await writer.write(encoder.encode(chunk))
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        let fullReply = ''
+        for await (const chunk of groqChatStream(groqMessages)) {
+          fullReply += chunk
+          controller.enqueue(encoder.encode(chunk))
+        }
+
+        const refused = fullReply.trim().startsWith('I was unable to find verses')
+        const followUps = refused || lowConfidence ? [] : await generateFollowUps(message, fullReply, language)
+
+        const meta = JSON.stringify({
+          citedVerses: refused ? [] : citedVersesMapped,
+          lowConfidence: lowConfidence || refused,
+          followUps,
+        })
+        controller.enqueue(encoder.encode(`\n<<<META>>>${meta}`))
+      } catch (err: any) {
+        console.error('[/api/chat stream]', err?.message)
+        const errMeta = JSON.stringify({
+          citedVerses: [],
+          lowConfidence: true,
+          followUps: [],
+          error: err?.message ?? 'stream failed',
+        })
+        controller.enqueue(encoder.encode(`\n<<<META>>>${errMeta}`))
+      } finally {
+        controller.close()
       }
+    },
+  })
 
-      const refused = fullReply.trim().startsWith('I was unable to find verses')
-      const followUps = refused || lowConfidence ? [] : await generateFollowUps(message, fullReply, language)
-
-      const meta = JSON.stringify({
-        citedVerses: refused ? [] : citedVersesMapped,
-        lowConfidence: lowConfidence || refused,
-        followUps,
-      })
-      await writer.write(encoder.encode(`\n<<<META>>>${meta}`))
-    } catch (err: any) {
-      console.error('[/api/chat stream]', err?.message)
-      const errMeta = JSON.stringify({
-        citedVerses: [],
-        lowConfidence: true,
-        followUps: [],
-        error: err?.message ?? 'stream failed',
-      })
-      await writer.write(encoder.encode(`\n<<<META>>>${errMeta}`))
-    } finally {
-      await writer.close()
-    }
-  })()
-
-  return new Response(readable, {
+  return new Response(stream, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'no-cache',
