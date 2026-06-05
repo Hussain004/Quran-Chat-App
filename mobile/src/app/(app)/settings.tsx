@@ -3,6 +3,7 @@ import { Text } from '@/lib/typography'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { enableDailyReminder, disableDailyReminder, isDailyReminderOn } from '@/lib/notifications'
 import { useState, useEffect, useMemo } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 import { useLanguage, LANGUAGE_LABELS, type AppLanguage } from '@/context/LanguageContext'
@@ -17,6 +18,7 @@ export default function SettingsScreen() {
   const { top } = useSafeAreaInsets()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
+  const [reminderOn, setReminderOn] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -26,6 +28,22 @@ export default function SettingsScreen() {
       }
     })
   }, [])
+
+  useEffect(() => { isDailyReminderOn().then(setReminderOn) }, [])
+
+  async function handleToggleReminder(value: boolean) {
+    if (value) {
+      const ok = await enableDailyReminder()
+      if (!ok) {
+        Alert.alert('Notifications off', 'Enable notifications in your device settings to get a daily reminder.')
+        return
+      }
+      setReminderOn(true)
+    } else {
+      await disableDailyReminder()
+      setReminderOn(false)
+    }
+  }
 
   async function handleSignOut() {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -57,6 +75,21 @@ export default function SettingsScreen() {
               onValueChange={toggleTheme}
               trackColor={{ false: colors.border, true: colors.accent }}
               thumbColor={isDark ? colors.bg : colors.surface}
+            />
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Notifications</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Daily verse reminder</Text>
+            <Switch
+              value={reminderOn}
+              onValueChange={handleToggleReminder}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={reminderOn ? colors.bg : colors.surface}
             />
           </View>
         </View>
