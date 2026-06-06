@@ -45,7 +45,6 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
   </tr>
 </table>
 </div>
--->
 
 <div align="center">
 <table>
@@ -63,31 +62,56 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
 
 ## Features
 
-- **Verse-grounded answers**: every reply cites the exact Qur'anic verses used to generate it
-- **Ibn Kathir tafseer**: cited verses include collapsible Ibn Kathir commentary, and the model weaves that commentary into its answers so it explains each verse rather than only quoting the translation
-- **Query understanding**: each question is first rewritten into a focused English search query, translating names to the spellings used in the translation (for example, Musa becomes Moses) and removing honorifics, which keeps retrieval accurate regardless of how the question is phrased
-- **Semantic search**: questions are matched by meaning, not keywords, using 768-dim embeddings over all 6,236 verses
-- **Low-confidence guard**: when no sufficiently close verses are found, the app says so and shows no irrelevant citations
-- **Natural read-aloud**: tap Listen on any answer to hear it in a natural neural voice (free Microsoft Edge voices for English, Urdu, and Arabic), with an on-device voice as an offline fallback
-- **Multi-language responses**: choose English, Urdu, or Arabic in Settings, and answers plus citations come back in the chosen language
-- **Light and dark theme**: toggle in Settings with the preference saved across sessions
-- **Conversation history**: all chats are persisted and grouped by recency (Today, Yesterday, This Week, Earlier)
-- **Auto-generated titles**: each conversation gets a 4 to 6 word title from the LLM
-- **Typography and design**: dark green palette with a gold accent, Fraunces display serif for headings and Plus Jakarta Sans for body text, and the NoorHira IndoPak Arabic font for verse text
-- **Retry on failure**: failed messages can be retried with one tap
+### AI and retrieval
+- **Verse-grounded answers**: every reply cites the exact Qur'anic verses used to generate it; the model is forbidden from adding anything outside those verses
+- **Streaming answers**: responses stream token-by-token from Groq's LLaMA 70B over a Vercel Edge runtime, so the first words appear in under a second
+- **Ibn Kathir tafseer**: cited verses include collapsible Ibn Kathir commentary, and the model weaves that commentary into its explanation so it teaches the verse rather than only quoting it
+- **Query understanding**: each question is rewritten by a fast 8B model into a focused English search query, translating names (Musa to Moses, Isa to Jesus) and stripping honorifics before the vector search runs
+- **Semantic search**: questions are matched by meaning, not keywords, using 768-dim Jina embeddings over all 6,236 verses stored in Supabase pgvector
+- **Exact verse lookup**: type a reference like 2:255 or a name like Ayat al-Kursi and the app pins that verse at the top of the context before running the semantic search
+- **Low-confidence guard**: when the top match scores below 0.65 similarity the app returns "consult a qualified scholar" and shows no citations at all
+- **Follow-up suggestions**: after every answer the API generates three contextually relevant follow-up questions as tappable chips
+
+### Content and reading
+- **Read verse in context**: tap any cited verse to see the surrounding ayat so you can read it in its narrative flow
+- **Qari recitation**: tap the audio button on any verse card to hear it recited by a Qari
+- **Share verse as image**: any verse can be exported as a styled image card and shared via the system share sheet
+- **Daily verse notification**: a new verse is surfaced on the home screen each day; optional push notification support included
+
+### Voice and audio
+- **Voice input**: tap the microphone to ask a question by voice; audio is transcribed server-side via Groq Whisper
+- **Natural read-aloud**: tap Listen on any answer to hear it in a neural voice (free Microsoft Edge TTS for English, Urdu, and Arabic) with an on-device fallback for offline use
+
+### Prayer and Qibla
+- **Prayer times and Qibla compass**: the Prayer tab uses your GPS to calculate all five daily prayers with Hanafi timings via the adhan library, counts down to the next prayer, and shows a Qibla compass driven by the device magnetometer -- all on-device with no external API
+
+### Language and customisation
+- **Multi-language responses**: choose English, Urdu, or Arabic in Settings; answers, citations, and follow-up chips all come back in the chosen language
+- **Bookmarks**: save any answer for later reference in a dedicated Saved tab
+- **Light and dark theme**: toggle in Settings with the preference persisted across sessions
+
+### Account and history
+- **Conversation history**: all chats are stored in Supabase and grouped by recency (Today, Yesterday, This Week, Earlier)
+- **Auto-generated titles**: each conversation gets a concise 4 to 6 word title generated by the LLM after the first message
+- **Retry on failure**: failed messages show a tap-to-retry option rather than a dead end
+
+### Design
+- **Typography**: dark green palette with a gold accent, Fraunces display serif for headings, Plus Jakarta Sans for body text, and the NoorHira IndoPak Arabic font for verse text
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Mobile | Expo SDK 56 / React Native 0.85, expo-router (file-based routing) |
-| Backend API | Next.js 16 on Vercel (`/api/chat`, `/api/title`, `/api/tts`) |
+| Backend API | Next.js 16 on Vercel Edge runtime (`/api/chat`, `/api/title`, `/api/tts`, `/api/transcribe`, `/api/verses`, `/api/daily-verse`) |
 | Database | Supabase (PostgreSQL + pgvector for vector search) |
 | Embeddings | Jina AI `jina-embeddings-v2-base-en` (768 dimensions) |
-| LLM | Groq `llama-3.3-70b-versatile` |
+| LLM | Groq `llama-3.3-70b-versatile` (answers), `llama-3.1-8b-instant` (query rewrite and titles) |
+| STT | Groq Whisper (`whisper-large-v3-turbo`) via `/api/transcribe` |
 | Tafseer | Ibn Kathir (English) via quran.com API, stored in Supabase |
 | Auth | Supabase Auth + expo-secure-store for session persistence |
 | TTS | Microsoft Edge neural voices via `/api/tts` (free, no key), with expo-speech as fallback, played through expo-audio |
+| Prayer | adhan library (on-device, no API) + expo-location + device magnetometer |
 | Build | EAS (Expo Application Services) |
 
 ## How Hallucination is Prevented
@@ -106,44 +130,57 @@ Every sentence in a confident response is traceable to a specific Surah and ayah
 
 ```
 User device (Expo)
-    |  POST /api/chat { message, history, language }
+    |
+    |  POST /api/chat { message, history, language, stream: true }
     v
-Vercel (Next.js API route)
-    |-- Groq               -->  rewrite question into an English search query
+Vercel Edge (Next.js)
+    |-- Groq 8b-instant    -->  rewrite question into an English search query
     |-- Jina AI            -->  embed the query (768-dim vector)
-    |-- Supabase pgvector  -->  match_verses() LEFT JOIN tafseer
+    |-- Supabase pgvector  -->  match_verses() LEFT JOIN tafseer  (top 8, threshold 0.60)
+    |-- named-verse lookup -->  pin exact verse if user typed e.g. "2:255" or "Ayat al-Kursi"
     |-- build grounded prompt (verse text + Ibn Kathir tafseer)
-    +-- Groq llama-3.3-70b -->  answer in requested language, grounded in tafseer
-    |  { reply, citedVerses (with tafseer), lowConfidence }
+    +-- Groq 70b stream    -->  stream answer token-by-token in requested language
+    |   \n<<<META>>>{ citedVerses, lowConfidence, followUps }
     v
-Expo app  -->  MessageBubble + VerseCard (Arabic + translation + tafseer)
-    |-- Listen action  -->  POST /api/tts  -->  neural MP3 played via expo-audio
-    +-- Supabase       -->  persist messages and conversation
+Expo app  -->  MessageBubble (streaming) + VerseCard (Arabic + translation + tafseer)
+    |-- Listen       -->  POST /api/tts        -->  Microsoft Edge neural MP3 via expo-audio
+    |-- Voice input  -->  POST /api/transcribe -->  Groq Whisper STT
+    |-- Read context -->  GET  /api/verses     -->  surrounding ayat from Supabase
+    |-- Daily verse  -->  GET  /api/daily-verse
+    +-- Supabase     -->  persist conversations and messages
+    |
+    |  Prayer tab (fully on-device, no API calls)
+    +-- expo-location + adhan library  -->  five daily prayer times (Hanafi)
+    +-- device magnetometer            -->  Qibla compass bearing
 ```
 
 ## Project Structure
 
 ```
 quran_chat_app/
-+-- api/                        Next.js 16 backend (deployed to Vercel)
++-- api/                        Next.js 16 backend (deployed to Vercel Edge)
 |   +-- app/api/
-|       +-- chat/route.ts       Main RAG pipeline (rewrite, embed, retrieve, tafseer, generate)
+|       +-- chat/route.ts       RAG pipeline: rewrite, embed, retrieve, generate (streaming)
 |       +-- title/route.ts      Auto-title generation
-|       +-- tts/route.ts        Neural text-to-speech (Microsoft Edge voices)
-+-- mobile/                     Expo app
+|       +-- tts/route.ts        Neural TTS (Microsoft Edge voices, no API key)
+|       +-- transcribe/route.ts Voice-to-text via Groq Whisper
+|       +-- verses/route.ts     Verse-in-context lookup (surrounding ayat)
+|       +-- daily-verse/route.ts Daily verse endpoint
++-- mobile/                     Expo SDK 56 app
 |   +-- src/
 |       +-- app/                expo-router screens
 |       |   +-- (auth)/         welcome, login, register
-|       |   +-- (app)/          home, history, settings (tab bar)
-|       |   +-- chat/[id].tsx   Chat screen
+|       |   +-- (app)/          home, history, saved, settings (tab bar)
+|       |   +-- (app)/prayer.tsx Prayer times and Qibla compass
+|       |   +-- chat/[id].tsx   Chat screen (streaming, voice input, follow-ups)
 |       +-- components/         MessageBubble, VerseCard, TypingIndicator, Skeleton
 |       +-- context/            ThemeContext, LanguageContext
 |       +-- hooks/              use-auth
-|       +-- lib/                supabase client, API helpers, theme tokens, speech (TTS + fallback)
+|       +-- lib/                supabase client, API helpers, theme tokens, speech
 +-- supabase/
 |   +-- schema.sql              Full DB schema (verses, tafseer, profiles, conversations, messages)
 +-- scripts/
-    +-- ingest-quran.js         One-time verse ingestion (Jina embeddings)
+    +-- ingest-quran.js         One-time verse ingestion (Jina embeddings -> Supabase)
     +-- ingest-tafseer.js       One-time tafseer ingestion (Ibn Kathir via quran.com)
 ```
 
@@ -204,7 +241,3 @@ eas build --platform android --profile preview
 ```
 
 Required environment variables: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_API_URL`
-
-## License
-
-MIT
