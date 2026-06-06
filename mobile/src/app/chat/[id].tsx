@@ -159,10 +159,17 @@ export default function ChatScreen() {
         })
         ;({ reply, citedVerses, lowConfidence, followUps } = result)
       } catch {
-        // Streaming failed; fall back to non-streaming and show typing indicator
+        // Streaming failed; fall back to non-streaming and animate the response
+        // word-by-word so it doesn't appear all at once after the long wait.
         setStreamingText('')
         const result = await sendMessage(text, history, language)
         ;({ reply, citedVerses, lowConfidence, followUps } = result)
+        let animated = ''
+        for (const word of reply.split(' ')) {
+          animated += (animated ? ' ' : '') + word
+          setStreamingText(animated)
+          await new Promise<void>(r => setTimeout(r, 15))
+        }
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)

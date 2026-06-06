@@ -53,6 +53,24 @@ export async function sendMessageStreaming(
   let sentUpTo = 0
   const guardLen = STREAM_SENTINEL.length - 1
 
+  // On mobile networks the TCP stack often coalesces multiple LLM tokens into
+  // one reader.read(), making onChunk fire once with the full response.
+  // React then batches that single setState with the subsequent clear and the
+  // text appears all at once. For large chunks we emit word-by-word with
+  // one-frame gaps so each word triggers its own render pass.
+  async function emit(text: string) {
+    if (!text) return
+    const words = text.split(' ')
+    if (words.length <= 4) {
+      onChunk(text)
+      return
+    }
+    for (let i = 0; i < words.length; i++) {
+      onChunk(words[i] + (i < words.length - 1 ? ' ' : ''))
+      await new Promise<void>(r => setTimeout(r, 15))
+    }
+  }
+
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
@@ -60,16 +78,18 @@ export async function sendMessageStreaming(
 
     const metaIdx = fullBuffer.indexOf(STREAM_SENTINEL)
     if (metaIdx !== -1) {
-      // Flush any remaining text before the sentinel
-      if (metaIdx > sentUpTo) onChunk(fullBuffer.slice(sentUpTo, metaIdx))
+      const finalPiece = fullBuffer.slice(sentUpTo, metaIdx)
+      sentUpTo = metaIdx
+      await emit(finalPiece)
       break
     }
 
     // Don't flush the last (guardLen) chars yet; they might be a split sentinel
     const safeEnd = fullBuffer.length - guardLen
     if (safeEnd > sentUpTo) {
-      onChunk(fullBuffer.slice(sentUpTo, safeEnd))
+      const piece = fullBuffer.slice(sentUpTo, safeEnd)
       sentUpTo = safeEnd
+      await emit(piece)
     }
   }
 
