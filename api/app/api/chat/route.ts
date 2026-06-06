@@ -143,6 +143,7 @@ async function generateFollowUps(message: string, reply: string, language: strin
       ],
       200,
       0.4,
+      'llama-3.1-8b-instant',
     )
     const start = raw.indexOf('[')
     const end = raw.lastIndexOf(']')
@@ -241,7 +242,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
     }
 
-    const searchQuery = await buildSearchQuery(message, history)
+    // Run exact-verse lookup in parallel with query rewrite -- both only need
+    // the original message, so there is no dependency between them.
+    const ref = parseVerseRef(message)
+    const [searchQuery, exactVerse] = await Promise.all([
+      buildSearchQuery(message, history),
+      ref ? fetchVerseByRef(ref.surah, ref.ayah) : Promise.resolve(null),
+    ])
+
     const queryEmbedding = await embedQuery(searchQuery)
 
     const { data: rpcVerses, error: rpcError } = await supabase.rpc('match_verses', {
@@ -250,9 +258,6 @@ export async function POST(req: NextRequest) {
       match_count: 8,
     })
     if (rpcError) throw new Error(rpcError.message)
-
-    const ref = parseVerseRef(message)
-    const exactVerse = ref ? await fetchVerseByRef(ref.surah, ref.ayah) : null
     const verses: any[] = exactVerse
       ? [
           exactVerse,
