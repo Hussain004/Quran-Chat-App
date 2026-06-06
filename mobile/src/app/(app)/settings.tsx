@@ -3,7 +3,10 @@ import { Text } from '@/lib/typography'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
-import { enableDailyReminder, disableDailyReminder, isDailyReminderOn } from '@/lib/notifications'
+import {
+  enableDailyReminder, disableDailyReminder, isDailyReminderOn,
+  enablePrayerNotifications, disablePrayerNotifications, isPrayerNotificationsEnabled,
+} from '@/lib/notifications'
 import { useState, useEffect, useMemo } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 import { useLanguage, LANGUAGE_LABELS, type AppLanguage } from '@/context/LanguageContext'
@@ -19,6 +22,7 @@ export default function SettingsScreen() {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [reminderOn, setReminderOn] = useState(false)
+  const [prayerNotifsOn, setPrayerNotifsOn] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -30,6 +34,7 @@ export default function SettingsScreen() {
   }, [])
 
   useEffect(() => { isDailyReminderOn().then(setReminderOn) }, [])
+  useEffect(() => { isPrayerNotificationsEnabled().then(setPrayerNotifsOn) }, [])
 
   async function handleToggleReminder(value: boolean) {
     if (value) {
@@ -42,6 +47,21 @@ export default function SettingsScreen() {
     } else {
       await disableDailyReminder()
       setReminderOn(false)
+    }
+  }
+
+  async function handleTogglePrayerNotifs(value: boolean) {
+    if (value) {
+      const ok = await enablePrayerNotifications()
+      if (!ok) {
+        Alert.alert('Notifications off', 'Enable notifications in your device settings to receive prayer time reminders.')
+        return
+      }
+      setPrayerNotifsOn(true)
+      Alert.alert('Prayer reminders on', 'Open the Prayer tab to schedule notifications for your location.')
+    } else {
+      await disablePrayerNotifications()
+      setPrayerNotifsOn(false)
     }
   }
 
@@ -96,6 +116,18 @@ export default function SettingsScreen() {
               thumbColor={reminderOn ? colors.bg : colors.surface}
             />
           </View>
+          <View style={[styles.row, styles.rowBorder]}>
+            <View style={styles.rowLabelWrap}>
+              <Text style={styles.rowLabel}>Prayer time reminders</Text>
+              <Text style={styles.rowSub}>Notified at each of the 5 prayers</Text>
+            </View>
+            <Switch
+              value={prayerNotifsOn}
+              onValueChange={handleTogglePrayerNotifs}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={prayerNotifsOn ? colors.bg : colors.surface}
+            />
+          </View>
         </View>
       </View>
 
@@ -147,7 +179,10 @@ function makeStyles(c: Colors) {
     about: { color: c.text, opacity: 0.8, fontSize: 14, lineHeight: 22, paddingVertical: 12 },
 
     row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+    rowBorder: { borderTopWidth: 1, borderTopColor: c.borderFaint },
+    rowLabelWrap: { flex: 1, gap: 2 },
     rowLabel: { color: c.text, fontSize: 15 },
+    rowSub: { color: c.textFaint, fontSize: 12 },
 
     langRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
     langRowBorder: { borderBottomWidth: 1, borderBottomColor: c.borderFaint },

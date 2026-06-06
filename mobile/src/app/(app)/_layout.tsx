@@ -51,14 +51,18 @@ export default function AppLayout() {
       />
       <Tabs.Screen
         name="saved"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="bookmark-outline" iconFocused="bookmark" label="Saved" focused={focused} />,
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="history"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon icon="time-outline" iconFocused="time" label="History" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          tabBarIcon: ({ focused }) => <TabIcon icon="calendar-outline" iconFocused="calendar" label="Calendar" focused={focused} />,
         }}
       />
       <Tabs.Screen

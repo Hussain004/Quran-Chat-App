@@ -10,6 +10,7 @@ import { Magnetometer } from 'expo-sensors'
 import { Coordinates, CalculationMethod, PrayerTimes, Qibla, Madhab } from 'adhan'
 import { useTheme } from '@/context/ThemeContext'
 import type { Colors } from '@/lib/theme'
+import { isPrayerNotificationsEnabled, schedulePrayerNotifications } from '@/lib/notifications'
 
 type Prayer = {
   key: string
@@ -93,6 +94,24 @@ export default function PrayerScreen() {
         const geo = await Location.reverseGeocodeAsync({ latitude, longitude })
         setCityName(geo[0]?.city ?? geo[0]?.district ?? geo[0]?.region ?? null)
       } catch { /* city name is optional */ }
+
+      // Schedule prayer notifications for today and tomorrow if enabled.
+      try {
+        const notifEnabled = await isPrayerNotificationsEnabled()
+        if (notifEnabled) {
+          const tomorrowDate = new Date()
+          tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+          const tomorrowTimes = new PrayerTimes(coords, tomorrowDate, params)
+          await schedulePrayerNotifications([
+            ...list,
+            { key: 'fajr',    label: 'Fajr',    time: tomorrowTimes.fajr },
+            { key: 'dhuhr',   label: 'Dhuhr',   time: tomorrowTimes.dhuhr },
+            { key: 'asr',     label: 'Asr',     time: tomorrowTimes.asr },
+            { key: 'maghrib', label: 'Maghrib', time: tomorrowTimes.maghrib },
+            { key: 'isha',    label: 'Isha',    time: tomorrowTimes.isha },
+          ])
+        }
+      } catch { /* non-critical */ }
     } catch (e: any) {
       setError(e?.message ?? 'Could not get your location. Please try again.')
     } finally {

@@ -84,6 +84,11 @@ An AI-powered conversational app grounded entirely in Qur'anic verses. Every ans
 
 ### Prayer and Qibla
 - **Prayer times and Qibla compass**: the Prayer tab uses your GPS to calculate all five daily prayers with Hanafi timings via the adhan library, counts down to the next prayer, and shows a Qibla compass driven by the device magnetometer -- all on-device with no external API
+- **Prayer time notifications**: opt-in reminders that fire at each of the five daily prayers; times are rescheduled automatically (today and tomorrow) each time the Prayer tab is opened so notifications stay accurate to your current location
+
+### Islamic Calendar
+- **Hijri calendar**: a dedicated Calendar tab shows today's Islamic date with the full monthly grid; the date is fetched from the Aladhan API (Umm al-Qura method) when online and falls back to the local tabular algorithm when offline
+- **Islamic events**: Ramadan, Eid al-Fitr, Eid al-Adha, Ashura, Mawlid, Isra and Mi'raj, and other dates are highlighted with dots on the calendar and listed below the grid; navigation arrows let you browse any Hijri month
 
 ### Language and customisation
 - **Multi-language responses**: choose English, Urdu, or Arabic in Settings; answers, citations, and follow-up chips all come back in the chosen language

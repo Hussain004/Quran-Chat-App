@@ -78,6 +78,15 @@ export default function HomeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: top + 20 }]} showsVerticalScrollIndicator={false}>
       <StatusBar style={colors.statusBar} />
 
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/saved' as any) }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="bookmark-outline" size={22} color={colors.textFaint} />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.header}>
         <Text style={styles.bismillah}>بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</Text>
         <Text style={styles.greeting}>
@@ -197,6 +206,8 @@ function makeStyles(c: Colors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
     content: { padding: 24, paddingBottom: 48 },
+
+    topBar: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 },
 
     header: { alignItems: 'center', marginBottom: 28 },
     bismillah: { color: c.accent, fontSize: 26, textAlign: 'center', marginBottom: 10, fontFamily: 'NoorHira', lineHeight: 48, writingDirection: 'rtl' },
