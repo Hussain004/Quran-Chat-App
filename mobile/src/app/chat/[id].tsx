@@ -153,26 +153,36 @@ export default function ChatScreen() {
       let followUps: string[] | undefined
 
       try {
+        // The onChunk callback is kept for networks where genuine token-by-token
+        // delivery works. On buffered mobile networks all chunks arrive at once,
+        // so we run a word-by-word animation AFTER the full response is in hand
+        // (see below). The animation must not run inside the stream-reader loop
+        // because async delays there block reader.read() and can close the stream
+        // before the sentinel arrives.
         const result = await sendMessageStreaming(text, history, language, (chunk) => {
           setStreamingText(prev => prev + chunk)
           listRef.current?.scrollToEnd({ animated: false })
         })
         ;({ reply, citedVerses, lowConfidence, followUps } = result)
       } catch {
-        // Streaming failed; fall back to non-streaming and animate the response
-        // word-by-word so it doesn't appear all at once after the long wait.
+        // Streaming failed; fall back to non-streaming.
         setStreamingText('')
         const result = await sendMessage(text, history, language)
         ;({ reply, citedVerses, lowConfidence, followUps } = result)
-        let animated = ''
-        for (const word of reply.split(' ')) {
-          animated += (animated ? ' ' : '') + word
-          setStreamingText(animated)
-          await new Promise<void>(r => setTimeout(r, 15))
-        }
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+
+      // Animate word-by-word. On buffered networks onChunk fires once with the
+      // full text, so this ensures the user always sees progressive display.
+      // We overwrite whatever onChunk may have set so the animation is consistent.
+      setStreamingText('')
+      let displayed = ''
+      for (const word of reply.split(' ')) {
+        displayed += (displayed ? ' ' : '') + word
+        setStreamingText(displayed)
+        await new Promise<void>(r => setTimeout(r, 15))
+      }
       setStreamingText('')
 
       const aiMsg: ChatMessage = {
