@@ -17,7 +17,13 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "web": {
       "output": "static",
@@ -76,8 +82,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "795d886f-8bcc-49d1-a816-045637e5a87e"
+        "projectId": "75769ea4-1e62-4da0-aacb-9fb1d2d6152f"
       }
-    }
+    },
+    "owner": "maskedhenry"
   }
 }
